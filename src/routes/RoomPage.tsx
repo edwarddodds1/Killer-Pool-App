@@ -109,16 +109,17 @@ export function RoomPage() {
   const [room, setRoom] = useState<RoomState | null>(() => getRoom(code))
   const [allocationPreview, setAllocationPreview] = useState<number | null>(null)
   const [orderSpinName, setOrderSpinName] = useState<string | null>(null)
-  const [eliminationText, setEliminationText] = useState('')
   const [orderPhase, setOrderPhase] = useState<OrderAnimPhase>('lineup')
   const [orderCards, setOrderCards] = useState<OrderAnimCard[]>([])
   const [dealingSlotIndex, setDealingSlotIndex] = useState<number | null>(null)
   const [orderAnimationDone, setOrderAnimationDone] = useState(false)
   const [localOrderStarted, setLocalOrderStarted] = useState(false)
   const [localOrderRunId, setLocalOrderRunId] = useState(0)
+  const [inviteCopied, setInviteCopied] = useState(false)
   const orderTimeoutsRef = useRef<number[]>([])
   const orderIntervalRef = useRef<number | null>(null)
   const orderAnimKeyRef = useRef('')
+  const inviteCopiedTimeoutRef = useRef<number | null>(null)
   const roomSnapshotRef = useRef<string>(JSON.stringify(room))
 
   useEffect(() => {
@@ -187,6 +188,10 @@ export function RoomPage() {
         window.clearInterval(orderIntervalRef.current)
         orderIntervalRef.current = null
       }
+      if (inviteCopiedTimeoutRef.current) {
+        window.clearTimeout(inviteCopiedTimeoutRef.current)
+        inviteCopiedTimeoutRef.current = null
+      }
     },
     [],
   )
@@ -208,6 +213,9 @@ export function RoomPage() {
       .map((player) => player.avatarIcon)
       .filter((icon): icon is string => Boolean(icon)),
   )
+  const selectedAvatarIndex = me?.avatarIcon
+    ? AVATAR_ICONS.findIndex((icon) => icon === me.avatarIcon)
+    : -1
 
   const saveRoom = (next: RoomState, oldCode?: string) => {
     roomSnapshotRef.current = JSON.stringify(next)
@@ -438,7 +446,6 @@ export function RoomPage() {
         owned.eliminated = true
         if (owner.id !== current.id) current.kills += 1
         nextEliminationOrder.push(owned.id)
-        setEliminationText(`${owned.username} eliminated (all assigned balls sunk)`)
       }
     }
 
@@ -563,7 +570,30 @@ export function RoomPage() {
     : null
   const breakerName = breakerPlayer ?? orderSpinName ?? 'Pending...'
 
-  const shareLink = `${window.location.origin}/join?code=${room.code}`
+  const shareLink = `${window.location.origin}/join?code=${encodeURIComponent(room.code)}`
+  const copyInviteLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareLink)
+    } catch {
+      const textarea = document.createElement('textarea')
+      textarea.value = shareLink
+      textarea.setAttribute('readonly', '')
+      textarea.style.position = 'absolute'
+      textarea.style.left = '-9999px'
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+    }
+    setInviteCopied(true)
+    if (inviteCopiedTimeoutRef.current) {
+      window.clearTimeout(inviteCopiedTimeoutRef.current)
+    }
+    inviteCopiedTimeoutRef.current = window.setTimeout(() => {
+      setInviteCopied(false)
+      inviteCopiedTimeoutRef.current = null
+    }, 1100)
+  }
 
   return (
     <main className="page">
@@ -578,26 +608,29 @@ export function RoomPage() {
         {me.assignedBalls.length > 0 ? (
           <div className="headerBallIndicator">
             {me.assignedBalls.map((ball) => (
-              <BallIcon key={ball} ball={ball} />
+              <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
             ))}
           </div>
         ) : room.status !== 'inGame' ? (
-          <button className="btn btn--small" onClick={() => navigator.clipboard?.writeText(shareLink)}>
-            Copy invite link
+          <button className={`btn btn--small ${inviteCopied ? 'btn--copied' : ''}`} onClick={copyInviteLink}>
+            {inviteCopied ? '✓ Copied' : 'Copy invite link'}
           </button>
         ) : null}
       </header>
 
       {room.status === 'lobby' ? (
         <section className="card">
-          <h2>Lobby</h2>
           <div className="stack">
-            <p className="muted">
-              {me.avatarIcon
-                ? 'You can change your icon any time. Taken icons are unavailable.'
-                : 'Icon is optional. You can keep your initial letter or pick an icon.'}
-            </p>
-            <div className="avatarPicker">
+            <div
+              className="avatarPicker"
+              style={
+                {
+                  '--avatar-count': AVATAR_ICONS.length,
+                  '--avatar-index': selectedAvatarIndex < 0 ? 0 : selectedAvatarIndex,
+                } as CSSProperties
+              }
+            >
+              {selectedAvatarIndex >= 0 ? <span className="avatarPicker__thumb" aria-hidden="true" /> : null}
               {AVATAR_ICONS.map((icon) => (
                 <button
                   key={icon}
@@ -743,7 +776,6 @@ export function RoomPage() {
               <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} onClick={() => potBall(ball)} />
             ))}
           </div>
-          {eliminationText ? <p className="error">{eliminationText}</p> : null}
           <div className="playersRow">
             {room.playOrder.map((id) => {
               const player = room.players.find((p) => p.id === id)
@@ -758,7 +790,7 @@ export function RoomPage() {
                 >
                   <div className="stack center">
                     <AvatarBadge username={player.username} avatarIcon={player.avatarIcon} size="sm" />
-                    <small>{player.username}</small>
+                    <small className="playerMiniName">{player.username}</small>
                     {isTurn ? <small className="turnBadge">TURN</small> : null}
                   </div>
                   <div className="playerMiniPots">

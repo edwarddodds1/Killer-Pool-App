@@ -40,7 +40,9 @@ export function HomePage() {
   return (
     <main className="page">
       <header className="brand">
-        <div className="brand__logo">K</div>
+        <div className="brand__logo">
+          <span className="brand__logoMark">K</span>
+        </div>
         <h1>Killer Pool</h1>
       </header>
 

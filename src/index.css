@@ -26,15 +26,29 @@ body { margin: 0; background: var(--bg); }
 
 .brand { text-align: center; display: grid; place-items: center; gap: 8px; }
 .brand__logo {
-  width: 82px;
+  width: 100px;
   aspect-ratio: 1;
   border-radius: 50%;
   background: #000;
-  color: #fff;
-  font-weight: 800;
-  font-size: 46px;
-  display: grid;
-  place-items: center;
+  color: #000;
+  font-weight: 900;
+  font-size: 2.7rem;
+  letter-spacing: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  isolation: isolate;
+}
+.brand__logoMark { display: block; line-height: 1; transform: translateY(-1px); }
+.brand__logo::before {
+  content: '';
+  position: absolute;
+  inset: 24%;
+  border-radius: 50%;
+  background: var(--bg);
+  z-index: -1;
 }
 
 h1, h2, p { margin: 0; }
@@ -70,6 +84,17 @@ input, select, .btn {
 .btn--primary { background: #000; color: #fff; }
 .btn--ready { background: var(--green); color: #fff; border-color: var(--green); }
 .btn--danger { background: var(--red); color: #fff; border-color: var(--red); }
+.btn--copied {
+  background: var(--green);
+  color: #fff;
+  border-color: var(--green);
+  animation: copiedPop 220ms ease;
+}
+@keyframes copiedPop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
 
 .muted { color: var(--muted); font-size: 0.92rem; }
 .error { color: #b62a2a; font-weight: 700; margin: 0; }
@@ -86,27 +111,45 @@ input, select, .btn {
 .avatar--sm { width: 32px; height: 32px; font-size: 0.95rem; }
 
 .avatarPicker {
+  position: relative;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   gap: 8px;
   width: 100%;
 }
+.avatarPicker__thumb {
+  position: absolute;
+  top: 0;
+  left: calc(
+    ((100% - (var(--avatar-count) - 1) * 8px) / var(--avatar-count)) * var(--avatar-index) +
+      var(--avatar-index) * 8px
+  );
+  width: calc((100% - (var(--avatar-count) - 1) * 8px) / var(--avatar-count));
+  height: 100%;
+  border-radius: 999px;
+  background: #111;
+  transition: left 220ms linear;
+  pointer-events: none;
+}
 .avatarPick {
+  position: relative;
+  z-index: 1;
   width: 100%;
   aspect-ratio: 1;
   min-height: 0;
   padding: 0;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 999px;
-  background: #fff;
+  background: transparent;
   font-size: 1.3rem;
   cursor: pointer;
   display: grid;
   place-items: center;
+  transition: color 220ms ease, border-color 220ms ease;
 }
 .avatarPick--taken { opacity: 0.35; cursor: not-allowed; }
-.avatarPick--selected { border-color: #111; box-shadow: inset 0 0 0 2px #111; }
+.avatarPick--selected { color: #fff; border-color: #111; }
 
 .playerList, .playerStack { display: grid; gap: 8px; }
 .playerRow {
@@ -261,6 +304,14 @@ input, select, .btn {
   letter-spacing: 0.04em;
   font-weight: 700;
 }
+.playerMiniName {
+  font-size: 0.72rem;
+  line-height: 1.05;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .playerMiniPots { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; justify-content: center; }
 .playerMiniPots .ball { width: 20px; border-width: 2px; }
@@ -329,7 +380,7 @@ input, select, .btn {
 }
 .dealCard__face--front { background: #fff; display: grid; place-items: center; gap: 6px; }
 .dealCard__face--front small {
-  font-size: clamp(0.42rem, calc(1.04rem - (var(--slot-count, 6) * 0.075rem)), 0.76rem);
+  font-size: clamp(0.38rem, calc(0.95rem - (var(--slot-count, 6) * 0.08rem)), 0.68rem);
   line-height: 1.05;
 }
 .dealCard__face--back {
@@ -391,6 +442,42 @@ input, select, .btn {
 }
 
 @media (max-width: 520px) {
+  .page { padding: 16px 10px 28px; gap: 10px; }
+  .card { padding: 12px; gap: 10px; }
   .split { grid-template-columns: 1fr; }
+  .header { align-items: flex-start; flex-wrap: wrap; }
+  .header__left { min-width: 0; }
+  .header__left > div { min-width: 0; }
+  .header__left strong,
+  .header__left p {
+    display: block;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .headerBallIndicator { width: 100%; justify-content: flex-end; }
+  .headerBallIndicator .ball { width: 34px; height: 34px; }
+  .headerBallIndicator .ball .ball__face span { font-size: 0.6rem; }
+  .ballReveal--multi .ball { width: clamp(52px, 14vw, 72px); }
+  .previewStage { min-height: 206px; padding: 8px; }
+  .shuffleTable { height: 188px; }
+  .dealSlot,
+  .dealCard { width: min(calc(100% / var(--slot-count, 6)), 94px); }
+  .dealCardIcon { font-size: clamp(0.7rem, calc(1.3rem - (var(--slot-count, 6) * 0.09rem)), 1rem); }
   .previewControls { grid-template-columns: 1fr; }
+  .dealCard__face--front small { font-size: clamp(0.32rem, 1.7vw, 0.52rem); }
+  .playerMiniName { font-size: 0.62rem; }
+  .playersRow { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .playerMiniCard { padding: 6px; gap: 4px; }
+  .playerMiniPots { gap: 2px; min-height: 16px; }
+  .playerMiniPots .ball { width: 14px; height: 14px; border-width: 1px; }
+  .playerMiniPots .ball .ball__face { border-width: 1px; }
+  .playerMiniPots .ball .ball__face span { font-size: 0.36rem; }
+  .resultsStats {
+    grid-template-columns: repeat(4, minmax(40px, 1fr));
+    column-gap: 8px;
+    font-size: 0.74rem;
+  }
+  .resultsHeaderRow { padding-top: 0; }
 }

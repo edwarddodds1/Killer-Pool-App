@@ -14,7 +14,7 @@ const balls: PoolBallInfo[] = [
   { number: 5, color: baseColors[4], striped: false },
   { number: 6, color: baseColors[5], striped: false },
   { number: 7, color: baseColors[6], striped: false },
-  { number: 8, color: '#111111', striped: false },
+  { number: 8, color: baseColors[5], striped: false },
   { number: 9, color: baseColors[0], striped: true },
   { number: 10, color: baseColors[1], striped: true },
   { number: 11, color: baseColors[2], striped: true },
