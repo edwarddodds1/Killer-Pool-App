@@ -29,6 +29,10 @@ export function HomePage() {
     }
     const profile = makeProfile(username)
     saveProfile(profile)
+    if (mode === 'timer') {
+      navigate('/timer')
+      return
+    }
     const rooms = getRooms()
     const room = buildNewRoom(profile, mode, killerAllocationMode)
     while (rooms[room.code] || (await getRoomRemote(room.code))) room.code = createRandomCode()
@@ -47,7 +51,7 @@ export function HomePage() {
       </header>
 
       <section className="card">
-        <h2>Create Party</h2>
+        <h2>{mode === 'timer' ? 'Timer Pool' : 'Create Party'}</h2>
         <form onSubmit={onCreate} className="stack">
           <label className="field">
             Username
@@ -63,27 +67,37 @@ export function HomePage() {
               Game
               <select value={mode} onChange={(e) => setMode(e.target.value as GameMode)}>
                 <option value="killer">Killer Pool</option>
-                <option value="kelly">Kelly Pool</option>
+                <option value="timer">Timer Pool</option>
               </select>
             </label>
-            <label className="field">
-              Allocation
-              <select
-                value={killerAllocationMode}
-                onChange={(e) => setKillerAllocationMode(e.target.value as KillerAllocationMode)}
-              >
-                <option value="single">Single ball</option>
-                <option value="multi">Multi ball</option>
-              </select>
-            </label>
+            {mode === 'killer' ? (
+              <label className="field">
+                Allocation
+                <select
+                  value={killerAllocationMode}
+                  onChange={(e) => setKillerAllocationMode(e.target.value as KillerAllocationMode)}
+                >
+                  <option value="single">Single ball</option>
+                  <option value="multi">Multi ball</option>
+                </select>
+              </label>
+            ) : null}
           </div>
           {error ? <p className="error">{error}</p> : null}
-          <button type="submit" className="btn btn--primary" disabled={!canCreate}>
-            Create Party
-          </button>
-          <button type="button" className="btn" onClick={() => navigate('/join')}>
-            Join Party
-          </button>
+          {mode === 'timer' ? (
+            <button type="submit" className="btn btn--primary" disabled={!canCreate}>
+              Begin Game
+            </button>
+          ) : (
+            <>
+              <button type="submit" className="btn btn--primary" disabled={!canCreate}>
+                Create Party
+              </button>
+              <button type="button" className="btn" onClick={() => navigate('/join')}>
+                Join Party
+              </button>
+            </>
+          )}
         </form>
       </section>
     </main>

@@ -22,3 +22,27 @@ for all
 to anon, authenticated
 using (true)
 with check (true);
+
+create table if not exists public.timer_pool_scores (
+  id bigint generated always as identity primary key,
+  profile_id text not null,
+  username text not null,
+  elapsed_ms integer not null check (elapsed_ms > 0),
+  created_at timestamptz not null default now()
+);
+
+alter table public.timer_pool_scores enable row level security;
+
+drop policy if exists "timer_pool_scores_all_select" on public.timer_pool_scores;
+create policy "timer_pool_scores_all_select"
+on public.timer_pool_scores
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "timer_pool_scores_all_insert" on public.timer_pool_scores;
+create policy "timer_pool_scores_all_insert"
+on public.timer_pool_scores
+for insert
+to anon, authenticated
+with check (true);

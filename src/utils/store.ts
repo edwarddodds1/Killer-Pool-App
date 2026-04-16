@@ -1,10 +1,19 @@
-import type { Profile, RoomState } from '../types'
+import type { Profile, RoomState, TimerScore } from '../types'
 import { supabase } from '../lib/supabase'
 
 const ROOMS_KEY = 'killer_pool_rooms_v1'
 const PROFILE_KEY = 'killer_pool_profile_v1'
+const TIMER_SCORES_KEY = 'killer_pool_timer_scores_v1'
 
 type RoomIndex = Record<string, RoomState>
+
+type TimerScoreRow = {
+  id?: number
+  profile_id: string
+  username: string
+  elapsed_ms: number
+  created_at: string
+}
 
 function loadJson<T>(key: string, fallback: T): T {
   const value = localStorage.getItem(key)
@@ -53,6 +62,7 @@ type RoomRow = {
 }
 
 const ROOMS_TABLE = 'killer_rooms'
+const TIMER_SCORES_TABLE = 'timer_pool_scores'
 
 export async function getRoomRemote(code: string) {
   if (!supabase) return null
@@ -75,6 +85,57 @@ export async function upsertRoomRemote(room: RoomState, oldCode?: string) {
     code: room.code,
     state: room,
     updated_at: new Date().toISOString(),
+  })
+}
+
+function normalizeTimerScore(row: TimerScoreRow): TimerScore {
+  return {
+    profileId: row.profile_id,
+    username: row.username,
+    elapsedMs: row.elapsed_ms,
+    createdAt: row.created_at,
+  }
+}
+
+export function getTimerScoresLocal() {
+  return loadJson<TimerScore[]>(TIMER_SCORES_KEY, [])
+}
+
+export function saveTimerScoresLocal(scores: TimerScore[]) {
+  saveJson(TIMER_SCORES_KEY, scores)
+}
+
+export async function getTimerScores() {
+  const local = getTimerScoresLocal()
+  if (!supabase) {
+    return local
+  }
+  const { data, error } = await supabase
+    .from(TIMER_SCORES_TABLE)
+    .select('profile_id, username, elapsed_ms, created_at')
+    .order('elapsed_ms', { ascending: true })
+    .returns<TimerScoreRow[]>()
+
+  if (error || !data) {
+    return local
+  }
+
+  return data.map(normalizeTimerScore)
+}
+
+export async function addTimerScore(input: Omit<TimerScore, 'createdAt'>) {
+  const nextLocalScore: TimerScore = {
+    ...input,
+    createdAt: new Date().toISOString(),
+  }
+  const local = getTimerScoresLocal()
+  saveTimerScoresLocal([...local, nextLocalScore])
+
+  if (!supabase) return
+  await supabase.from(TIMER_SCORES_TABLE).insert({
+    profile_id: input.profileId,
+    username: input.username,
+    elapsed_ms: input.elapsedMs,
   })
 }
 

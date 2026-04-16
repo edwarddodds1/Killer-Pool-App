@@ -429,6 +429,162 @@ input, select, .btn {
 .previewControls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .previewControls input[type='range'] { width: 100%; }
 
+.timerPage { gap: 10px; }
+.timerCard { gap: 10px; }
+.timerCard--main {
+  min-height: calc(100vh - 140px);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  align-items: center;
+  position: relative;
+}
+.timerHeader {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}
+.timerHomeBtn {
+  border: 0;
+  background: transparent;
+  color: #6d6d6d;
+  font-size: 0.78rem;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.timerHomeIcon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.timerDisplay {
+  font-size: clamp(2.35rem, 11.5vw, 4.3rem);
+  font-weight: 800;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f7f7f7;
+}
+.timerDisplay__group {
+  display: inline-block;
+  min-width: 2.1ch;
+  text-align: center;
+}
+.timerDisplay__group--centi {
+  min-width: 2.1ch;
+}
+.timerDisplay__separator {
+  display: inline-block;
+  min-width: 0.5ch;
+  text-align: center;
+  margin: 0 0.2ch;
+  opacity: 0.9;
+}
+.timerControls {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+.timerControls .btn { min-height: 66px; font-size: 1.1rem; width: 100%; }
+.timerList { display: grid; gap: 8px; }
+.timerRow {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.timerRow strong { font-variant-numeric: tabular-nums; }
+.timerRow small {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.timerRow--leaderboard { grid-template-columns: auto 1fr auto; }
+
+/* Timer results/leaderboard screen */
+.timerResultsPage { gap: 10px; }
+.timerResultsCard { gap: 12px; }
+.timerResultsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.timerResultsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.timerResultsPanel h3 { margin: 0; font-size: 1rem; }
+.timerResultsSummary {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.timerSummaryRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f7f7f7;
+}
+.timerSummaryRow span {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.timerList--dense { gap: 6px; }
+.timerRow--compact {
+  padding: 6px 8px;
+}
+.timerRow--leaderboardCompact {
+  padding: 6px 8px;
+}
+.timerRow--compact strong { font-variant-numeric: tabular-nums; }
+
+.timerPerformanceLists {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.timerPerformanceBlock h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+.timerRow--selectable {
+  cursor: pointer;
+}
+.timerRow--selected {
+  background: #eaeaea;
+}
+.timerRow--hidden {
+  opacity: 0.9;
+}
+.timerResultsActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.timerHomeBtn--small {
+  border: 0;
+  background: transparent;
+  color: #6d6d6d;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+.timerRowUser { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .leaveGameBtn {
   border: 0;
   background: transparent;
@@ -480,4 +636,23 @@ input, select, .btn {
     font-size: 0.74rem;
   }
   .resultsHeaderRow { padding-top: 0; }
+  .timerDisplay {
+    font-size: clamp(2.45rem, 14.5vw, 3.4rem);
+    padding: 8px 6px;
+  }
+  .timerCard--main { min-height: calc(100vh - 160px); }
+  .timerHomeBtn { font-size: 0.74rem; }
+  .timerHomeIcon { width: 16px; height: 16px; }
+  .timerDisplay__group { min-width: 2ch; }
+  .timerDisplay__separator { margin: 0 0.16ch; }
+  .timerControls .btn { min-height: 58px; }
+  .timerResultsGrid { grid-template-columns: 1fr; }
+  .timerResultsActions { grid-template-columns: 1fr; }
+  .timerRow {
+    grid-template-columns: auto 1fr auto;
+    padding: 7px 8px;
+    font-size: 0.88rem;
+    gap: 8px;
+  }
+  .timerRow small { font-size: 0.72rem; }
 }

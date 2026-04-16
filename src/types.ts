@@ -1,4 +1,4 @@
-export type GameMode = 'killer' | 'kelly'
+export type GameMode = 'killer' | 'kelly' | 'timer'
 export type KillerAllocationMode = 'single' | 'multi'
 export type RoomStatus = 'lobby' | 'allocation' | 'order' | 'inGame' | 'results'
 
@@ -32,4 +32,11 @@ export interface RoomState {
   turnIndex: number
   sunkBalls: number[]
   eliminationOrder: string[]
+}
+
+export interface TimerScore {
+  profileId: string
+  username: string
+  elapsedMs: number
+  createdAt: string
 }
