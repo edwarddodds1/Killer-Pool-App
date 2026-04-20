@@ -46,3 +46,10 @@ on public.timer_pool_scores
 for insert
 to anon, authenticated
 with check (true);
+
+drop policy if exists "timer_pool_scores_all_delete" on public.timer_pool_scores;
+create policy "timer_pool_scores_all_delete"
+on public.timer_pool_scores
+for delete
+to anon, authenticated
+using (true);

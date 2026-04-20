@@ -139,6 +139,28 @@ export async function addTimerScore(input: Omit<TimerScore, 'createdAt'>) {
   })
 }
 
+export async function deleteTimerScore(input: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'>) {
+  const local = getTimerScoresLocal()
+  const nextLocal = local.filter(
+    (score) =>
+      !(
+        score.profileId === input.profileId &&
+        score.elapsedMs === input.elapsedMs &&
+        score.createdAt === input.createdAt
+      ),
+  )
+  saveTimerScoresLocal(nextLocal)
+
+  if (!supabase) return
+
+  await supabase
+    .from(TIMER_SCORES_TABLE)
+    .delete()
+    .eq('profile_id', input.profileId)
+    .eq('elapsed_ms', input.elapsedMs)
+    .eq('created_at', input.createdAt)
+}
+
 export function subscribeRoomRemote(
   code: string,
   onRoom: (room: RoomState) => void,

@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
-import { getProfile, getTimerScores } from '../utils/store'
+import { deleteTimerScore, getProfile, getTimerScores } from '../utils/store'
+
+const ADMIN_USERNAMES = new Set(['edward', 'edwarddodds1'])
+const ADMIN_PROFILE_IDS = new Set(
+  (import.meta.env.VITE_TIMER_ADMIN_PROFILE_IDS ?? '')
+    .split(',')
+    .map((id: string) => id.trim())
+    .filter(Boolean),
+)
 
 function formatElapsed(ms: number) {
   const minutes = Math.floor(ms / 60_000)
@@ -17,9 +25,23 @@ function formatDateLabel(iso: string) {
 
 export function TimerResultsPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const profile = getProfile()
   const [scores, setScores] = useState<TimerScore[]>([])
   const [selectedRunKey, setSelectedRunKey] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const [deletingRunKey, setDeletingRunKey] = useState<string | null>(null)
+
+  const invalidRun = searchParams.get('invalid') === '1'
+
+  const scoreKey = (score: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'>) =>
+    `${score.profileId}__${score.elapsedMs}__${score.createdAt}`
+
+  const isAdmin = useMemo(() => {
+    if (!profile) return false
+    const normalized = profile.username.trim().toLowerCase()
+    return ADMIN_USERNAMES.has(normalized) || ADMIN_PROFILE_IDS.has(profile.id)
+  }, [profile])
 
   const loadScores = async () => {
     const nextScores = await getTimerScores()
@@ -63,6 +85,34 @@ export function TimerResultsPage() {
     .slice(0, 3)
   const recent5Runs = userRuns.slice(0, 5)
 
+  const onDeleteRun = async (score: TimerScore) => {
+    if (!profile || score.profileId !== profile.id) return
+    const runKey = scoreKey(score)
+    const confirmed = window.confirm('Delete this attempt?')
+    if (!confirmed) return
+
+    setError('')
+    setDeletingRunKey(runKey)
+    const previous = scores
+    setScores((prev) => prev.filter((run) => scoreKey(run) !== runKey))
+    if (selectedRunKey === runKey) {
+      setSelectedRunKey(null)
+    }
+
+    try {
+      await deleteTimerScore({
+        profileId: score.profileId,
+        elapsedMs: score.elapsedMs,
+        createdAt: score.createdAt,
+      })
+    } catch {
+      setScores(previous)
+      setError('Could not delete that attempt. Please try again.')
+    } finally {
+      setDeletingRunKey(null)
+    }
+  }
+
   return (
     <main className="page timerResultsPage">
       <section className="card timerResultsCard">
@@ -78,6 +128,11 @@ export function TimerResultsPage() {
         <div className="timerResultsGrid">
           <div className="timerResultsPanel">
             <h3>Your performance</h3>
+            {invalidRun ? (
+              <p className="muted">Runs under 20 seconds are invalid and are not recorded.</p>
+            ) : null}
+            {isAdmin ? <p className="muted">Admin mode is active: you can delete any leaderboard attempt.</p> : null}
+            {error ? <p className="error">{error}</p> : null}
             <div className="timerResultsSummary">
               <div className="timerSummaryRow">
                 <span>Best</span>
@@ -94,8 +149,9 @@ export function TimerResultsPage() {
                 <div className="timerList timerList--dense">
                   {bestRuns.length ? (
                     bestRuns.map((score, index) => {
-                      const runKey = `best-${score.createdAt}-${index}`
+                      const runKey = scoreKey(score)
                       const isSelected = selectedRunKey === runKey
+                      const deleting = deletingRunKey === runKey
                       return (
                         <div
                           key={runKey}
@@ -109,7 +165,23 @@ export function TimerResultsPage() {
                         >
                           <span>#{index + 1}</span>
                           <strong>{formatElapsed(score.elapsedMs)}</strong>
-                          {isSelected ? <small>{formatDateLabel(score.createdAt)}</small> : null}
+                          <div className="timerRowActions">
+                            {isSelected ? <small>{formatDateLabel(score.createdAt)}</small> : null}
+                            <button
+                              type="button"
+                              className="timerDeleteBtn"
+                              disabled={deleting}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void onDeleteRun(score)
+                              }}
+                              onKeyDown={(event) => {
+                                event.stopPropagation()
+                              }}
+                            >
+                              {deleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
                         </div>
                       )
                     })
@@ -124,8 +196,9 @@ export function TimerResultsPage() {
                 <div className="timerList timerList--dense">
                   {recent5Runs.length ? (
                     recent5Runs.map((score, index) => {
-                      const runKey = `recent-${score.createdAt}-${index}`
+                      const runKey = scoreKey(score)
                       const isSelected = selectedRunKey === runKey
+                      const deleting = deletingRunKey === runKey
                       return (
                         <div
                           key={runKey}
@@ -139,7 +212,23 @@ export function TimerResultsPage() {
                         >
                           <span>#{index + 1}</span>
                           <strong>{formatElapsed(score.elapsedMs)}</strong>
-                          {isSelected ? <small>{formatDateLabel(score.createdAt)}</small> : null}
+                          <div className="timerRowActions">
+                            {isSelected ? <small>{formatDateLabel(score.createdAt)}</small> : null}
+                            <button
+                              type="button"
+                              className="timerDeleteBtn"
+                              disabled={deleting}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void onDeleteRun(score)
+                              }}
+                              onKeyDown={(event) => {
+                                event.stopPropagation()
+                              }}
+                            >
+                              {deleting ? 'Deleting...' : 'Delete'}
+                            </button>
+                          </div>
                         </div>
                       )
                     })
@@ -155,13 +244,31 @@ export function TimerResultsPage() {
             <h3>All-time leaderboard</h3>
             <div className="timerList">
               {leaderboard.length ? (
-                leaderboard.map((score, index) => (
-                  <div key={`${score.profileId}-${index}`} className="timerRow timerRow--leaderboardCompact">
-                    <span>#{index + 1}</span>
-                    <span className="timerRowUser">{score.username}</span>
-                    <strong>{formatElapsed(score.elapsedMs)}</strong>
-                  </div>
-                ))
+                leaderboard.map((score, index) => {
+                  const runKey = scoreKey(score)
+                  const deleting = deletingRunKey === runKey
+                  return (
+                    <div key={runKey} className="timerRow timerRow--leaderboardCompact">
+                      <span>#{index + 1}</span>
+                      <span className="timerRowUser">{score.username}</span>
+                      <div className="timerRowActions">
+                        <strong>{formatElapsed(score.elapsedMs)}</strong>
+                        {isAdmin ? (
+                          <button
+                            type="button"
+                            className="timerDeleteBtn"
+                            disabled={deleting}
+                            onClick={() => {
+                              void onDeleteRun(score)
+                            }}
+                          >
+                            {deleting ? 'Deleting...' : 'Delete'}
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })
               ) : (
                 <p className="muted">Leaderboard is empty.</p>
               )}

@@ -44,8 +44,15 @@ export function HomePage() {
   return (
     <main className="page">
       <header className="brand">
-        <div className="brand__logo">
-          <span className="brand__logoMark">K</span>
+        <div className="brand__logo" aria-hidden="true">
+          <svg viewBox="0 0 100 100" className="brand__logoSvg">
+            <circle cx="50" cy="50" r="48" fill="#000" />
+            <circle cx="50" cy="50" r="24" fill="#ececec" />
+            <path
+              d="M41.2 35.8h4.8v12.4l10.3-12.4h6.4L50.8 50l12.2 14.3h-6.4L46 51.9v12.4h-4.8V35.8Z"
+              fill="#000"
+            />
+          </svg>
         </div>
         <h1>Killer Pool</h1>
       </header>
@@ -98,6 +105,14 @@ export function HomePage() {
               </button>
             </>
           )}
+          <button type="button" className="btn" onClick={() => navigate('/timer/results')}>
+            <span className="btn__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" className="btn__iconSvg">
+                <path d="M3 21h18v-2H3v2Zm2-3h4v-7H5v7Zm5 0h4v-11h-4v11Zm5 0h4v-5h-4v5Z" fill="currentColor" />
+              </svg>
+            </span>{' '}
+            Leaderboard
+          </button>
         </form>
       </section>
     </main>

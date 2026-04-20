@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { addTimerScore, getProfile } from '../utils/store'
 
+const MIN_VALID_TIMER_RUN_MS = 20_000
+
 function formatElapsedParts(ms: number) {
   const minutes = Math.floor(ms / 60_000)
   const seconds = Math.floor((ms % 60_000) / 1_000)
@@ -56,17 +58,20 @@ export function TimerPoolPage() {
   const finishRun = async () => {
     if (!profile || elapsedMs <= 0 || saving) return
     const finalElapsed = runningSince === null ? elapsedMs : Date.now() - runningSince
+    const isValidRun = finalElapsed >= MIN_VALID_TIMER_RUN_MS
     setRunningSince(null)
     setElapsedMs(finalElapsed)
     setSaving(true)
     try {
-      await addTimerScore({
-        profileId: profile.id,
-        username: profile.username,
-        elapsedMs: finalElapsed,
-      })
+      if (isValidRun) {
+        await addTimerScore({
+          profileId: profile.id,
+          username: profile.username,
+          elapsedMs: finalElapsed,
+        })
+      }
       setRunFinalized(true)
-      navigate('/timer/results')
+      navigate(isValidRun ? '/timer/results' : '/timer/results?invalid=1')
     } finally {
       setSaving(false)
     }
