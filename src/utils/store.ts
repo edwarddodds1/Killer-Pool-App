@@ -158,7 +158,7 @@ function validateAccountInput(username: string, password: string) {
   if (!/^[A-Za-z0-9_]{4,15}$/.test(trimmed)) {
     throw new Error('Username must be 4-15 characters (letters, numbers, underscore).')
   }
-  if (password.length < 4) {
+  if (password.trim().length < 4) {
     throw new Error('Password must be at least 4 characters.')
   }
 }
@@ -166,6 +166,7 @@ function validateAccountInput(username: string, password: string) {
 export async function registerAccount(username: string, password: string) {
   validateAccountInput(username, password)
   const cleanUsername = username.trim()
+  const cleanPassword = password.trim()
   const usernameKey = usernameToKey(cleanUsername)
   const accounts = await getAccounts()
   if (accounts.some((account) => account.usernameKey === usernameKey)) {
@@ -176,7 +177,7 @@ export async function registerAccount(username: string, password: string) {
     profileId: crypto.randomUUID(),
     username: cleanUsername,
     usernameKey,
-    password,
+    password: cleanPassword,
   }
 
   if (supabase) {
@@ -202,7 +203,9 @@ export async function registerAccount(username: string, password: string) {
 
 export async function signInAccount(username: string, password: string) {
   validateAccountInput(username, password)
-  const usernameKey = usernameToKey(username)
+  const cleanUsername = username.trim()
+  const cleanPassword = password.trim()
+  const usernameKey = usernameToKey(cleanUsername)
   let account: AccountRecord | undefined
 
   const remoteMatches = await getAccountsRemote(usernameKey)
@@ -216,10 +219,15 @@ export async function signInAccount(username: string, password: string) {
 
   if (!account) {
     const accounts = await getAccounts()
-    account = accounts.find((entry) => entry.usernameKey === usernameKey)
+    account = accounts.find(
+      (entry) => usernameToKey(entry.username || entry.usernameKey) === usernameKey,
+    )
   }
 
-  if (!account || account.password !== password) {
+  const matchesPassword = Boolean(
+    account && (account.password === cleanPassword || account.password.trim() === cleanPassword),
+  )
+  if (!account || !matchesPassword) {
     throw new Error('Invalid username or password.')
   }
 

@@ -10,6 +10,7 @@ import {
   getRooms,
   getTimerScores,
   registerAccount,
+  saveProfile,
   signInAccount,
   upsertRoom,
   upsertRoomRemote,
@@ -63,6 +64,21 @@ export function HomePage() {
     } finally {
       setAuthBusy(false)
     }
+  }
+
+  const onContinueAsGuest = () => {
+    const guestName = authUsername.trim()
+    if (guestName.length < 2) {
+      setError('Enter a username with at least 2 characters to continue as guest.')
+      return
+    }
+    saveProfile({
+      id: crypto.randomUUID(),
+      username: guestName,
+    })
+    setProfile(getProfile())
+    setAuthPassword('')
+    setError('')
   }
 
   const onCreate = async (event: FormEvent) => {
@@ -176,6 +192,9 @@ export function HomePage() {
               {error ? <p className="error">{error}</p> : null}
               <button type="submit" className="btn btn--primary" disabled={authBusy}>
                 {authMode === 'signup' ? 'Create account' : 'Sign in'}
+              </button>
+              <button type="button" className="btn btn--soft" onClick={onContinueAsGuest} disabled={authBusy}>
+                Continue as guest
               </button>
               <button
                 type="button"
