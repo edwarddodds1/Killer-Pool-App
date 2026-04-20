@@ -53,3 +53,27 @@ on public.timer_pool_scores
 for delete
 to anon, authenticated
 using (true);
+
+create table if not exists public.user_accounts (
+  profile_id text primary key,
+  username text not null,
+  username_key text not null unique,
+  password text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.user_accounts enable row level security;
+
+drop policy if exists "user_accounts_all_select" on public.user_accounts;
+create policy "user_accounts_all_select"
+on public.user_accounts
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "user_accounts_all_insert" on public.user_accounts;
+create policy "user_accounts_all_insert"
+on public.user_accounts
+for insert
+to anon, authenticated
+with check (true);

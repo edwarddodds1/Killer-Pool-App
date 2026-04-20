@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
 import { deleteTimerScore, getProfile, getTimerScores } from '../utils/store'
+import { isSupabaseEnabled } from '../lib/supabase'
 
-const ADMIN_USERNAMES = new Set(['edward', 'edwarddodds1'])
+const ADMIN_USERNAMES = new Set(['edwarddodds1'])
 const ADMIN_PROFILE_IDS = new Set(
   (import.meta.env.VITE_TIMER_ADMIN_PROFILE_IDS ?? '')
     .split(',')
@@ -42,6 +43,7 @@ export function TimerResultsPage() {
     const normalized = profile.username.trim().toLowerCase()
     return ADMIN_USERNAMES.has(normalized) || ADMIN_PROFILE_IDS.has(profile.id)
   }, [profile])
+  const supabaseEnabled = isSupabaseEnabled()
 
   const loadScores = async () => {
     const nextScores = await getTimerScores()
@@ -50,13 +52,8 @@ export function TimerResultsPage() {
   }
 
   useEffect(() => {
-    if (!profile) {
-      navigate('/')
-      return
-    }
     void loadScores()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigate])
+  }, [])
 
   const userRuns = useMemo(() => {
     if (!profile) return []
@@ -71,13 +68,15 @@ export function TimerResultsPage() {
     return s.elapsedMs < best.elapsedMs ? s : best
   }, null)
 
+  const allRankedRuns = useMemo(
+    () => scores.slice().sort((a, b) => a.elapsedMs - b.elapsedMs),
+    [scores],
+  )
+
   const leaderboard = useMemo(() => {
-    // Show fastest 10 runs overall (not just per-player bests).
-    return scores
-      .slice()
-      .sort((a, b) => a.elapsedMs - b.elapsedMs)
-      .slice(0, 10)
-  }, [scores])
+    // Keep all records, but only render top 10 fastest.
+    return allRankedRuns.slice(0, 10)
+  }, [allRankedRuns])
 
   const bestRuns = userRuns
     .slice()
@@ -86,7 +85,8 @@ export function TimerResultsPage() {
   const recent5Runs = userRuns.slice(0, 5)
 
   const onDeleteRun = async (score: TimerScore) => {
-    if (!profile || score.profileId !== profile.id) return
+    if (!profile) return
+    if (!isAdmin && score.profileId !== profile.id) return
     const runKey = scoreKey(score)
     const confirmed = window.confirm('Delete this attempt?')
     if (!confirmed) return
@@ -130,6 +130,9 @@ export function TimerResultsPage() {
             <h3>Your performance</h3>
             {invalidRun ? (
               <p className="muted">Runs under 20 seconds are invalid and are not recorded.</p>
+            ) : null}
+            {!supabaseEnabled ? (
+              <p className="muted">Cloud leaderboard is not connected on this deployment yet.</p>
             ) : null}
             {isAdmin ? <p className="muted">Admin mode is active: you can delete any leaderboard attempt.</p> : null}
             {error ? <p className="error">{error}</p> : null}

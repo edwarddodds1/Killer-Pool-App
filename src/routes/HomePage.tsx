@@ -1,34 +1,60 @@
 import { useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { GameMode, KillerAllocationMode, Profile } from '../types'
+import type { GameMode, KillerAllocationMode } from '../types'
 import { buildNewRoom, createRandomCode } from '../utils/game'
-import { getProfile, getRooms, getRoomRemote, saveProfile, upsertRoom, upsertRoomRemote } from '../utils/store'
-
-function makeProfile(username: string): Profile {
-  const existing = getProfile()
-  if (existing) {
-    return { ...existing, username: username.trim() }
-  }
-  return { id: crypto.randomUUID(), username: username.trim() }
-}
+import {
+  clearProfile,
+  getProfile,
+  getRoomRemote,
+  getRooms,
+  registerAccount,
+  signInAccount,
+  upsertRoom,
+  upsertRoomRemote,
+} from '../utils/store'
 
 export function HomePage() {
   const navigate = useNavigate()
-  const [username, setUsername] = useState(() => getProfile()?.username ?? '')
+  const [profile, setProfile] = useState(() => getProfile())
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin')
+  const [authUsername, setAuthUsername] = useState('')
+  const [authPassword, setAuthPassword] = useState('')
+  const [authBusy, setAuthBusy] = useState(false)
   const [mode, setMode] = useState<GameMode>('killer')
   const [killerAllocationMode, setKillerAllocationMode] = useState<KillerAllocationMode>('single')
   const [error, setError] = useState('')
-  const canCreate = useMemo(() => username.trim().length > 1, [username])
+  const canCreate = useMemo(() => Boolean(profile), [profile])
+
+  const onAuthSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setError('')
+    setAuthBusy(true)
+    try {
+      if (authMode === 'signup') {
+        await registerAccount(authUsername, authPassword)
+      } else {
+        await signInAccount(authUsername, authPassword)
+      }
+      setProfile(getProfile())
+      setAuthPassword('')
+    } catch (authError) {
+      setError(authError instanceof Error ? authError.message : 'Could not authenticate.')
+    } finally {
+      setAuthBusy(false)
+    }
+  }
 
   const onCreate = async (event: FormEvent) => {
     event.preventDefault()
-    if (!canCreate) {
-      setError('Enter at least 2 characters for username.')
+    if (!profile) {
+      setError('Sign in to continue.')
       return
     }
-    const profile = makeProfile(username)
-    saveProfile(profile)
+    if (!canCreate) {
+      setError('Sign in to continue.')
+      return
+    }
     if (mode === 'timer') {
       navigate('/timer')
       return
@@ -41,9 +67,18 @@ export function HomePage() {
     navigate(`/room/${room.code}`)
   }
 
+  const onOpenLeaderboard = () => {
+    navigate('/timer/results')
+  }
+
+  const onSignOut = () => {
+    clearProfile()
+    setProfile(null)
+  }
+
   return (
-    <main className="page">
-      <header className="brand">
+    <main className="page homePage">
+      <header className="brand homeHero">
         <div className="brand__logo" aria-hidden="true">
           <svg viewBox="0 0 100 100" className="brand__logoSvg">
             <circle cx="50" cy="50" r="48" fill="#000" />
@@ -57,64 +92,158 @@ export function HomePage() {
         <h1>Killer Pool</h1>
       </header>
 
-      <section className="card">
-        <h2>{mode === 'timer' ? 'Timer Pool' : 'Create Party'}</h2>
-        <form onSubmit={onCreate} className="stack">
-          <label className="field">
-            Username
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your name"
-              maxLength={20}
-            />
-          </label>
-          <div className="split">
-            <label className="field">
-              Game
-              <select value={mode} onChange={(e) => setMode(e.target.value as GameMode)}>
-                <option value="killer">Killer Pool</option>
-                <option value="timer">Timer Pool</option>
-              </select>
-            </label>
-            {mode === 'killer' ? (
-              <label className="field">
-                Allocation
-                <select
-                  value={killerAllocationMode}
-                  onChange={(e) => setKillerAllocationMode(e.target.value as KillerAllocationMode)}
+      <section className="card homeCard">
+        {!profile ? (
+          <>
+            <div className="homeCard__header">
+              <h2>{authMode === 'signup' ? 'Create Account' : 'Sign In'}</h2>
+              <div className="authSwitch" role="tablist" aria-label="Authentication mode">
+                <button
+                  type="button"
+                  className={`authSwitch__btn ${authMode === 'signin' ? 'authSwitch__btn--active' : ''}`}
+                  onClick={() => {
+                    setError('')
+                    setAuthMode('signin')
+                  }}
                 >
-                  <option value="single">Single ball</option>
-                  <option value="multi">Multi ball</option>
-                </select>
+                  Sign in
+                </button>
+                <button
+                  type="button"
+                  className={`authSwitch__btn ${authMode === 'signup' ? 'authSwitch__btn--active' : ''}`}
+                  onClick={() => {
+                    setError('')
+                    setAuthMode('signup')
+                  }}
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+            <form onSubmit={onAuthSubmit} className="stack">
+              <label className="field">
+                Username
+                <input
+                  value={authUsername}
+                  onChange={(e) => setAuthUsername(e.target.value)}
+                  placeholder="4-15 characters"
+                  maxLength={15}
+                />
               </label>
-            ) : null}
-          </div>
-          {error ? <p className="error">{error}</p> : null}
-          {mode === 'timer' ? (
-            <button type="submit" className="btn btn--primary" disabled={!canCreate}>
-              Begin Game
-            </button>
-          ) : (
-            <>
-              <button type="submit" className="btn btn--primary" disabled={!canCreate}>
-                Create Party
+              <label className="field">
+                Password
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  placeholder="At least 4 characters"
+                  maxLength={32}
+                />
+              </label>
+              {error ? <p className="error">{error}</p> : null}
+              <button type="submit" className="btn btn--primary" disabled={authBusy}>
+                {authMode === 'signup' ? 'Create account' : 'Sign in'}
               </button>
-              <button type="button" className="btn" onClick={() => navigate('/join')}>
-                Join Party
+              <button
+                type="button"
+                className="btn btn--soft"
+                onClick={() => {
+                  setError('')
+                  setAuthMode((curr) => (curr === 'signup' ? 'signin' : 'signup'))
+                }}
+              >
+                {authMode === 'signup' ? 'I already have an account' : 'Create a new account'}
               </button>
-            </>
-          )}
-          <button type="button" className="btn" onClick={() => navigate('/timer/results')}>
-            <span className="btn__icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" className="btn__iconSvg">
-                <path d="M3 21h18v-2H3v2Zm2-3h4v-7H5v7Zm5 0h4v-11h-4v11Zm5 0h4v-5h-4v5Z" fill="currentColor" />
-              </svg>
-            </span>{' '}
-            Leaderboard
-          </button>
-        </form>
+            </form>
+          </>
+        ) : (
+          <>
+            <div className="homeCard__header">
+              <h2>GameMode</h2>
+            </div>
+            <form onSubmit={onCreate} className="stack">
+              <div className="field">
+                <div className="modeSlider" style={{ '--slider-index': mode === 'killer' ? 0 : 1 } as CSSProperties}>
+                  <div className="modeSlider__thumb" aria-hidden="true" />
+                  <button
+                    type="button"
+                    className={`modeSlider__btn ${mode === 'killer' ? 'modeSlider__btn--active' : ''}`}
+                    onClick={() => setMode('killer')}
+                  >
+                    Killer Pool
+                  </button>
+                  <button
+                    type="button"
+                    className={`modeSlider__btn ${mode === 'timer' ? 'modeSlider__btn--active' : ''}`}
+                    onClick={() => setMode('timer')}
+                  >
+                    Timer Pool
+                  </button>
+                </div>
+              </div>
+              <div className="field">
+                <div
+                  className={`modeSlider ${mode === 'timer' ? 'modeSlider--disabled' : ''}`}
+                  style={{
+                    '--slider-index': killerAllocationMode === 'single' ? 0 : 1,
+                  } as CSSProperties}
+                >
+                  <div className="modeSlider__thumb" aria-hidden="true" />
+                  <button
+                    type="button"
+                    className={`modeSlider__btn ${killerAllocationMode === 'single' ? 'modeSlider__btn--active' : ''}`}
+                    onClick={() => setKillerAllocationMode('single')}
+                    disabled={mode === 'timer'}
+                  >
+                    Single ball
+                  </button>
+                  <button
+                    type="button"
+                    className={`modeSlider__btn ${killerAllocationMode === 'multi' ? 'modeSlider__btn--active' : ''}`}
+                    onClick={() => setKillerAllocationMode('multi')}
+                    disabled={mode === 'timer'}
+                  >
+                    Multi ball
+                  </button>
+                </div>
+              </div>
+              {error ? <p className="error">{error}</p> : null}
+              {mode === 'timer' ? (
+                <button type="submit" className="btn btn--primary" disabled={!canCreate}>
+                  Begin Game
+                </button>
+              ) : (
+                <>
+                  <button type="submit" className="btn btn--primary" disabled={!canCreate}>
+                    Start Game
+                  </button>
+                </>
+              )}
+              <div className="homeActionsRow">
+                <button type="button" className="btn btn--soft" onClick={() => navigate('/join')}>
+                  Join Party
+                </button>
+                <button type="button" className="btn btn--soft" onClick={onOpenLeaderboard}>
+                  <span className="btn__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" className="btn__iconSvg">
+                      <path d="M3 21h18v-2H3v2Zm2-3h4v-7H5v7Zm5 0h4v-11h-4v11Zm5 0h4v-5h-4v5Z" fill="currentColor" />
+                    </svg>
+                  </span>{' '}
+                  Leaderboard
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </section>
+      {profile ? (
+        <footer className="homeSessionFooter">
+          <span>Signed in as <strong>{profile.username}</strong></span>
+          <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
+            Sign out
+          </button>
+        </footer>
+      ) : null}
     </main>
   )
 }

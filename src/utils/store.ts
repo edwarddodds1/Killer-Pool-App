@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 const ROOMS_KEY = 'killer_pool_rooms_v1'
 const PROFILE_KEY = 'killer_pool_profile_v1'
 const TIMER_SCORES_KEY = 'killer_pool_timer_scores_v1'
+const ACCOUNTS_KEY = 'killer_pool_accounts_v1'
 
 type RoomIndex = Record<string, RoomState>
 
@@ -13,6 +14,20 @@ type TimerScoreRow = {
   username: string
   elapsed_ms: number
   created_at: string
+}
+
+type AccountRecord = {
+  profileId: string
+  username: string
+  usernameKey: string
+  password: string
+}
+
+type AccountRow = {
+  profile_id: string
+  username: string
+  username_key: string
+  password: string
 }
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -35,6 +50,10 @@ export function getProfile() {
 
 export function saveProfile(profile: Profile) {
   saveJson(PROFILE_KEY, profile)
+}
+
+export function clearProfile() {
+  localStorage.removeItem(PROFILE_KEY)
 }
 
 export function getRooms() {
@@ -63,6 +82,20 @@ type RoomRow = {
 
 const ROOMS_TABLE = 'killer_rooms'
 const TIMER_SCORES_TABLE = 'timer_pool_scores'
+const ACCOUNTS_TABLE = 'user_accounts'
+
+function usernameToKey(username: string) {
+  return username.trim().toLowerCase()
+}
+
+function normalizeAccountRow(row: AccountRow): AccountRecord {
+  return {
+    profileId: row.profile_id,
+    username: row.username,
+    usernameKey: row.username_key,
+    password: row.password,
+  }
+}
 
 export async function getRoomRemote(code: string) {
   if (!supabase) return null
@@ -86,6 +119,99 @@ export async function upsertRoomRemote(room: RoomState, oldCode?: string) {
     state: room,
     updated_at: new Date().toISOString(),
   })
+}
+
+function getAccountsLocal() {
+  return loadJson<AccountRecord[]>(ACCOUNTS_KEY, [])
+}
+
+function saveAccountsLocal(accounts: AccountRecord[]) {
+  saveJson(ACCOUNTS_KEY, accounts)
+}
+
+async function getAccountsRemote() {
+  if (!supabase) return null
+  const { data, error } = await supabase
+    .from(ACCOUNTS_TABLE)
+    .select('profile_id, username, username_key, password')
+    .returns<AccountRow[]>()
+
+  if (error || !data) return null
+  return data.map(normalizeAccountRow)
+}
+
+async function getAccounts() {
+  const local = getAccountsLocal()
+  const remote = await getAccountsRemote()
+  if (!remote) return local
+  saveAccountsLocal(remote)
+  return remote
+}
+
+function validateAccountInput(username: string, password: string) {
+  const trimmed = username.trim()
+  if (!/^[A-Za-z0-9_]{4,15}$/.test(trimmed)) {
+    throw new Error('Username must be 4-15 characters (letters, numbers, underscore).')
+  }
+  if (password.length < 4) {
+    throw new Error('Password must be at least 4 characters.')
+  }
+}
+
+export async function registerAccount(username: string, password: string) {
+  validateAccountInput(username, password)
+  const cleanUsername = username.trim()
+  const usernameKey = usernameToKey(cleanUsername)
+  const accounts = await getAccounts()
+  if (accounts.some((account) => account.usernameKey === usernameKey)) {
+    throw new Error('Username is already taken.')
+  }
+
+  const next: AccountRecord = {
+    profileId: crypto.randomUUID(),
+    username: cleanUsername,
+    usernameKey,
+    password,
+  }
+
+  const nextLocal = [...accounts, next]
+  saveAccountsLocal(nextLocal)
+  saveProfile({ id: next.profileId, username: next.username })
+
+  if (!supabase) return { id: next.profileId, username: next.username }
+
+  const { error } = await supabase.from(ACCOUNTS_TABLE).insert({
+    profile_id: next.profileId,
+    username: next.username,
+    username_key: next.usernameKey,
+    password: next.password,
+  })
+  if (error) {
+    if (error.message.toLowerCase().includes('duplicate')) {
+      throw new Error('Username is already taken.')
+    }
+    throw new Error('Could not create account right now.')
+  }
+
+  return { id: next.profileId, username: next.username }
+}
+
+export async function signInAccount(username: string, password: string) {
+  validateAccountInput(username, password)
+  const usernameKey = usernameToKey(username)
+  const accounts = await getAccounts()
+  const account = accounts.find((entry) => entry.usernameKey === usernameKey)
+  if (!account || account.password !== password) {
+    throw new Error('Invalid username or password.')
+  }
+
+  const existing = getProfile()
+  saveProfile({
+    id: account.profileId,
+    username: account.username,
+    avatarIcon: existing?.id === account.profileId ? existing.avatarIcon : undefined,
+  })
+  return { id: account.profileId, username: account.username }
 }
 
 function normalizeTimerScore(row: TimerScoreRow): TimerScore {

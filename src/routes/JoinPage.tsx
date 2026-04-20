@@ -1,36 +1,21 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { Profile } from '../types'
-import { getProfile, getRoom, getRoomRemote, saveProfile, upsertRoom, upsertRoomRemote } from '../utils/store'
-
-function ensureProfile(username: string): Profile {
-  const existing = getProfile()
-  if (existing) {
-    const next = { ...existing, username: username.trim() }
-    saveProfile(next)
-    return next
-  }
-  const profile: Profile = { id: crypto.randomUUID(), username: username.trim() }
-  saveProfile(profile)
-  return profile
-}
+import { getProfile, getRoom, getRoomRemote, upsertRoom, upsertRoomRemote } from '../utils/store'
 
 export function JoinPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [username, setUsername] = useState(getProfile()?.username ?? '')
+  const profile = getProfile()
   const [code, setCode] = useState(searchParams.get('code') ?? '')
   const [error, setError] = useState('')
 
   const onJoin = async (event: FormEvent) => {
     event.preventDefault()
+    if (!profile) return setError('Please sign in on the home screen first.')
     const cleanCode = code.replace(/\D/g, '').slice(0, 4)
     const room = (await getRoomRemote(cleanCode)) ?? getRoom(cleanCode)
     if (!room) return setError('No party found for that code.')
-    if (username.trim().length < 2) return setError('Enter a username with at least 2 characters.')
-
-    const profile = ensureProfile(username)
     if (!room.players.some((player) => player.id === profile.id)) {
       room.players.push({
         id: profile.id,
@@ -54,16 +39,9 @@ export function JoinPage() {
     <main className="page">
       <section className="card">
         <h2>Join Party</h2>
+        {!profile ? <p className="muted">Sign in from Home to join with your account.</p> : null}
         <form onSubmit={onJoin} className="stack">
-          <label className="field">
-            Username
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your name"
-              maxLength={20}
-            />
-          </label>
+          {profile ? <p className="muted">Joining as <strong>{profile.username}</strong></p> : null}
           <label className="field">
             4-digit code
             <input
