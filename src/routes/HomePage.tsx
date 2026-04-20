@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { GameMode, KillerAllocationMode } from '../types'
@@ -8,11 +8,14 @@ import {
   getProfile,
   getRoomRemote,
   getRooms,
+  getTimerScores,
   registerAccount,
   signInAccount,
   upsertRoom,
   upsertRoomRemote,
 } from '../utils/store'
+
+const MEDAL_ICONS = ['🥇', '🥈', '🥉'] as const
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -24,7 +27,24 @@ export function HomePage() {
   const [mode, setMode] = useState<GameMode>('killer')
   const [killerAllocationMode, setKillerAllocationMode] = useState<KillerAllocationMode>('single')
   const [error, setError] = useState('')
+  const [titleMedals, setTitleMedals] = useState<Array<{ username: string; rank: 1 | 2 | 3 }>>([])
   const canCreate = useMemo(() => Boolean(profile), [profile])
+
+  useEffect(() => {
+    const loadTitleMedals = async () => {
+      const ranked = (await getTimerScores())
+        .slice()
+        .sort((a, b) => a.elapsedMs - b.elapsedMs)
+        .slice(0, 3)
+      setTitleMedals(
+        ranked.map((score, index) => ({
+          username: score.username,
+          rank: (index + 1) as 1 | 2 | 3,
+        })),
+      )
+    }
+    void loadTitleMedals()
+  }, [])
 
   const onAuthSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -89,9 +109,19 @@ export function HomePage() {
             />
           </svg>
         </div>
-        <h1>Killer Pool</h1>
+        <div className="homeTitleBlock">
+          <h1>KILLER POOL</h1>
+          {titleMedals.length ? (
+            <div className="homeTitleMedals" aria-label="Current leaderboard leaders">
+              {titleMedals.map((entry, index) => (
+                <span className="homeMedalTag" key={`${entry.rank}-${entry.username}-${index}`}>
+                  <span aria-hidden="true">{MEDAL_ICONS[entry.rank - 1]}</span> {entry.username}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </header>
-
       <section className="card homeCard">
         {!profile ? (
           <>
@@ -158,10 +188,7 @@ export function HomePage() {
           </>
         ) : (
           <>
-            <div className="homeCard__header">
-              <h2>GameMode</h2>
-            </div>
-            <form onSubmit={onCreate} className="stack">
+            <form onSubmit={onCreate} className="stack homeSetupForm">
               <div className="field">
                 <div className="modeSlider" style={{ '--slider-index': mode === 'killer' ? 0 : 1 } as CSSProperties}>
                   <div className="modeSlider__thumb" aria-hidden="true" />
@@ -209,12 +236,12 @@ export function HomePage() {
               </div>
               {error ? <p className="error">{error}</p> : null}
               {mode === 'timer' ? (
-                <button type="submit" className="btn btn--primary" disabled={!canCreate}>
-                  Begin Game
+                <button type="submit" className="btn btn--go" disabled={!canCreate}>
+                  Start Game
                 </button>
               ) : (
                 <>
-                  <button type="submit" className="btn btn--primary" disabled={!canCreate}>
+                  <button type="submit" className="btn btn--go" disabled={!canCreate}>
                     Start Game
                   </button>
                 </>
@@ -229,7 +256,7 @@ export function HomePage() {
                       <path d="M3 21h18v-2H3v2Zm2-3h4v-7H5v7Zm5 0h4v-11h-4v11Zm5 0h4v-5h-4v5Z" fill="currentColor" />
                     </svg>
                   </span>{' '}
-                  Leaderboard
+                  Timer Leaderboard
                 </button>
               </div>
             </form>

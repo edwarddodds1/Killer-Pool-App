@@ -13,6 +13,11 @@
 }
 
 * { box-sizing: border-box; }
+html, body, #root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
 body { margin: 0; background: var(--bg); }
 #root { min-height: 100vh; }
 
@@ -28,11 +33,14 @@ body { margin: 0; background: var(--bg); }
   position: relative;
   gap: 14px;
   min-height: 100vh;
+  padding-top: 12px;
 }
 .homePage::before {
   content: '';
   position: absolute;
-  inset: -24px -16px auto;
+  top: -24px;
+  left: 0;
+  right: 0;
   height: 220px;
   background:
     radial-gradient(80% 70% at 0% 0%, rgba(0, 0, 0, 0.08), transparent 70%),
@@ -44,22 +52,58 @@ body { margin: 0; background: var(--bg); }
 .homeHero {
   position: relative;
   z-index: 1;
-  padding-top: 4px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding-top: 0;
+}
+.homeTitleBlock {
+  min-height: 100px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
 }
 .brand__logo {
   width: 100px;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
+  border: 2px solid #111;
+  border-radius: 50%;
 }
 .brand__logoSvg {
   width: 100%;
   height: 100%;
   display: block;
 }
+h1 {
+  font-size: clamp(2.3rem, 8.5vw, 3.35rem);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  margin: 0;
+}
 h1, h2, p { margin: 0; }
-h1 { font-size: 1.7rem; }
 h2 { font-size: 1.2rem; }
+.homeTitleMedals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.homeMedalTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #111;
+  background: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
 
 .card {
   border: 1px solid var(--border);
@@ -69,6 +113,20 @@ h2 { font-size: 1.2rem; }
   display: grid;
   gap: 12px;
   box-shadow: var(--shadow);
+}
+.prepStageCard {
+  animation: prepStageIn 220ms ease;
+  will-change: opacity, transform;
+}
+@keyframes prepStageIn {
+  from {
+    opacity: 0.86;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .homeCard {
   position: relative;
@@ -81,6 +139,7 @@ h2 { font-size: 1.2rem; }
   align-items: baseline;
   justify-content: space-between;
   gap: 10px;
+  margin-bottom: 2px;
 }
 .homeCard__sub {
   color: var(--muted);
@@ -92,6 +151,7 @@ h2 { font-size: 1.2rem; }
 .header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .header__left { display: flex; align-items: center; gap: 8px; }
 .stack { display: grid; gap: 8px; }
+.homeSetupForm { gap: 6px; }
 .split { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .homeSessionFooter {
   margin-top: auto;
@@ -139,6 +199,11 @@ input, select, .btn {
 }
 .btn--small { min-height: 36px; font-size: 0.9rem; }
 .btn--primary { background: #000; color: #fff; }
+.btn--go {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
 .btn--soft {
   background: #f4f4f4;
   border-color: #cecece;
@@ -162,7 +227,7 @@ input, select, .btn {
 .authSwitch {
   display: inline-grid;
   grid-template-columns: 1fr 1fr;
-  border: 1px solid var(--border);
+  border: 1px solid #111;
   background: #f4f4f4;
   border-radius: 999px;
   padding: 2px;
@@ -182,6 +247,7 @@ input, select, .btn {
   background: #fff;
   color: #111;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  border: 1px solid #111;
 }
 .modeSlider {
   --slider-index: 0;
@@ -189,7 +255,7 @@ input, select, .btn {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 4px;
-  border: 1px solid #cfcfcf;
+  border: 1px solid #111;
   border-radius: 12px;
   background: #f2f2f2;
   padding: 4px;
@@ -202,6 +268,7 @@ input, select, .btn {
   height: calc(100% - 8px);
   border-radius: 9px;
   background: #111;
+  border: 1px solid #111;
   transition: left 220ms ease;
   pointer-events: none;
 }
@@ -227,6 +294,7 @@ input, select, .btn {
 }
 .modeSlider--disabled .modeSlider__thumb {
   background: #b8b8b8;
+  border-color: #8f8f8f;
 }
 .modeSlider--disabled .modeSlider__btn {
   color: #8f8f8f;
@@ -533,7 +601,8 @@ input, select, .btn {
   color: #fff;
 }
 .dealCardIcon {
-  font-size: clamp(0.8rem, calc(1.58rem - (var(--slot-count, 6) * 0.09rem)), 1.3rem);
+  font-size: clamp(1.25rem, calc(2.55rem - (var(--slot-count, 6) * 0.15rem)), 2rem);
+  line-height: 1;
 }
 .backMark {
   width: 28px;
@@ -650,13 +719,36 @@ input, select, .btn {
 .timerRow--leaderboard { grid-template-columns: auto 1fr auto; }
 
 /* Timer results/leaderboard screen */
-.timerResultsPage { gap: 10px; }
+.timerResultsPage { gap: 0; padding-top: 10px; }
+.timerResultsTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.timerResultsTitle {
+  font-size: clamp(2.3rem, 8.5vw, 3.35rem);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  margin: 0 0 2px;
+}
+.adminModeIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 1px solid #111;
+  background: #fff;
+  font-size: 0.95rem;
+}
 .timerResultsCard { gap: 12px; }
 .timerResultsHeader {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  gap: 10px;
+  gap: 0;
 }
 .timerResultsGrid {
   display: grid;
@@ -732,7 +824,7 @@ input, select, .btn {
 }
 .timerResultsActions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 10px;
 }
 .timerHomeBtn--small {
@@ -758,8 +850,30 @@ input, select, .btn {
 
 @media (max-width: 520px) {
   .page { padding: 16px 10px 28px; gap: 10px; }
-  .homePage::before { inset: -16px -10px auto; height: 190px; }
+  .homePage::before {
+    top: -16px;
+    left: 0;
+    right: 0;
+    height: 190px;
+  }
   .homeCard__header { align-items: center; }
+  .homeHero {
+    gap: 10px;
+  }
+  .homeHero .brand__logo {
+    width: 84px;
+  }
+  .homeTitleBlock {
+    min-height: 84px;
+    gap: 4px;
+  }
+  h1 {
+    font-size: clamp(2.15rem, 9vw, 2.85rem);
+  }
+  .homeMedalTag {
+    font-size: 0.66rem;
+    padding: 2px 6px;
+  }
   .card { padding: 12px; gap: 10px; }
   .split { grid-template-columns: 1fr; }
   .homeActionsRow { grid-template-columns: 1fr; }
@@ -782,7 +896,7 @@ input, select, .btn {
   .shuffleTable { height: 188px; }
   .dealSlot,
   .dealCard { width: min(calc(100% / var(--slot-count, 6)), 94px); }
-  .dealCardIcon { font-size: clamp(0.7rem, calc(1.3rem - (var(--slot-count, 6) * 0.09rem)), 1rem); }
+  .dealCardIcon { font-size: clamp(1rem, calc(2.05rem - (var(--slot-count, 6) * 0.14rem)), 1.45rem); }
   .previewControls { grid-template-columns: 1fr; }
   .dealCard__face--front small { font-size: clamp(0.32rem, 1.7vw, 0.52rem); }
   .playerMiniName { font-size: 0.62rem; }
@@ -810,6 +924,14 @@ input, select, .btn {
   .timerControls .btn { min-height: 58px; }
   .timerResultsGrid { grid-template-columns: 1fr; }
   .timerResultsActions { grid-template-columns: 1fr; }
+  .timerResultsTitle {
+    font-size: clamp(2.15rem, 9vw, 2.85rem);
+  }
+  .adminModeIcon {
+    width: 26px;
+    height: 26px;
+    font-size: 0.82rem;
+  }
   .timerRow {
     grid-template-columns: auto 1fr auto;
     padding: 7px 8px;

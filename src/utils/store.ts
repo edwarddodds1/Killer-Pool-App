@@ -129,12 +129,17 @@ function saveAccountsLocal(accounts: AccountRecord[]) {
   saveJson(ACCOUNTS_KEY, accounts)
 }
 
-async function getAccountsRemote() {
+async function getAccountsRemote(usernameKey?: string) {
   if (!supabase) return null
-  const { data, error } = await supabase
+  let query = supabase
     .from(ACCOUNTS_TABLE)
     .select('profile_id, username, username_key, password')
-    .returns<AccountRow[]>()
+
+  if (usernameKey) {
+    query = query.eq('username_key', usernameKey)
+  }
+
+  const { data, error } = await query.returns<AccountRow[]>()
 
   if (error || !data) return null
   return data.map(normalizeAccountRow)
@@ -174,33 +179,46 @@ export async function registerAccount(username: string, password: string) {
     password,
   }
 
+  if (supabase) {
+    const { error } = await supabase.from(ACCOUNTS_TABLE).insert({
+      profile_id: next.profileId,
+      username: next.username,
+      username_key: next.usernameKey,
+      password: next.password,
+    })
+    if (error) {
+      if (error.message.toLowerCase().includes('duplicate')) {
+        throw new Error('Username is already taken.')
+      }
+      throw new Error('Could not create account right now.')
+    }
+  }
+
   const nextLocal = [...accounts, next]
   saveAccountsLocal(nextLocal)
   saveProfile({ id: next.profileId, username: next.username })
-
-  if (!supabase) return { id: next.profileId, username: next.username }
-
-  const { error } = await supabase.from(ACCOUNTS_TABLE).insert({
-    profile_id: next.profileId,
-    username: next.username,
-    username_key: next.usernameKey,
-    password: next.password,
-  })
-  if (error) {
-    if (error.message.toLowerCase().includes('duplicate')) {
-      throw new Error('Username is already taken.')
-    }
-    throw new Error('Could not create account right now.')
-  }
-
   return { id: next.profileId, username: next.username }
 }
 
 export async function signInAccount(username: string, password: string) {
   validateAccountInput(username, password)
   const usernameKey = usernameToKey(username)
-  const accounts = await getAccounts()
-  const account = accounts.find((entry) => entry.usernameKey === usernameKey)
+  let account: AccountRecord | undefined
+
+  const remoteMatches = await getAccountsRemote(usernameKey)
+  if (remoteMatches && remoteMatches.length) {
+    account = remoteMatches[0]
+    const local = getAccountsLocal()
+    if (!local.some((entry) => entry.profileId === account?.profileId)) {
+      saveAccountsLocal([...local, account])
+    }
+  }
+
+  if (!account) {
+    const accounts = await getAccounts()
+    account = accounts.find((entry) => entry.usernameKey === usernameKey)
+  }
+
   if (!account || account.password !== password) {
     throw new Error('Invalid username or password.')
   }

@@ -18,6 +18,7 @@ import {
 
 const TICK_MS = 600
 const REMOTE_SYNC_MS = 1800
+const PREP_SPIN_MS = 520
 const MAX_PLAYERS = 8
 const BOT_NAMES = ['CueBot', 'RackBot', 'SpinBot', 'GhostCue', 'PocketPro', 'RailRunner', 'BankShot', 'SidePocket']
 const SHUFFLE_TUNING_KEY = 'killer_pool_shuffle_tuning_v1'
@@ -389,7 +390,7 @@ export function RoomPage() {
       clearInterval(tempSpinner)
       setAllocationPreview((allocation.get(me.id) ?? [1])[0])
       saveRoom({ ...room, status: 'allocation', players: nextPlayers })
-    }, 1300)
+    }, PREP_SPIN_MS)
   }
 
   const startOrder = () => {
@@ -415,7 +416,7 @@ export function RoomPage() {
       }
       setOrderSpinName(next.players.find((player) => player.id === order[0])?.username ?? null)
       saveRoom(next)
-    }, 1200)
+    }, PREP_SPIN_MS)
   }
 
   const beginMatch = () => {
@@ -619,7 +620,7 @@ export function RoomPage() {
       </header>
 
       {room.status === 'lobby' ? (
-        <section className="card">
+        <section className="card prepStageCard">
           <div className="stack">
             <div
               className="avatarPicker"
@@ -685,7 +686,7 @@ export function RoomPage() {
       ) : null}
 
       {room.status === 'allocation' && !shouldShowOrderStage ? (
-        <section className="card center">
+        <section className="card center prepStageCard">
           <h2>Ball Allocation</h2>
           <p className="muted">Your random ball</p>
           <div className={`ballReveal ${me.assignedBalls.length > 1 ? 'ballReveal--multi' : ''}`}>
@@ -700,7 +701,7 @@ export function RoomPage() {
       ) : null}
 
       {shouldShowOrderStage ? (
-        <section className="card">
+        <section className="card prepStageCard">
           <h2>Break & Order</h2>
           <p className="muted">
             Breaker:{' '}

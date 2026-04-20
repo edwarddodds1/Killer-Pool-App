@@ -67,6 +67,9 @@ export function TimerResultsPage() {
     if (!best) return s
     return s.elapsedMs < best.elapsedMs ? s : best
   }, null)
+  const userAverageMs = userRuns.length
+    ? Math.round(userRuns.reduce((sum, run) => sum + run.elapsedMs, 0) / userRuns.length)
+    : null
 
   const allRankedRuns = useMemo(
     () => scores.slice().sort((a, b) => a.elapsedMs - b.elapsedMs),
@@ -115,9 +118,16 @@ export function TimerResultsPage() {
 
   return (
     <main className="page timerResultsPage">
+      <div className="timerResultsTitleRow">
+        <h1 className="timerResultsTitle">Leaderboard</h1>
+        {isAdmin ? (
+          <span className="adminModeIcon" aria-label="Admin mode active" title="Admin mode active">
+            👥
+          </span>
+        ) : null}
+      </div>
       <section className="card timerResultsCard">
         <div className="timerResultsHeader">
-          <h2>Leaderboard</h2>
           <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
             <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
@@ -134,7 +144,6 @@ export function TimerResultsPage() {
             {!supabaseEnabled ? (
               <p className="muted">Cloud leaderboard is not connected on this deployment yet.</p>
             ) : null}
-            {isAdmin ? <p className="muted">Admin mode is active: you can delete any leaderboard attempt.</p> : null}
             {error ? <p className="error">{error}</p> : null}
             <div className="timerResultsSummary">
               <div className="timerSummaryRow">
@@ -144,6 +153,10 @@ export function TimerResultsPage() {
               <div className="timerSummaryRow">
                 <span>Runs</span>
                 <strong>{userRuns.length}</strong>
+              </div>
+              <div className="timerSummaryRow">
+                <span>Average</span>
+                <strong>{userAverageMs !== null ? formatElapsed(userAverageMs) : '--:--.--'}</strong>
               </div>
             </div>
             <div className="timerPerformanceLists">
@@ -281,9 +294,6 @@ export function TimerResultsPage() {
         <div className="timerResultsActions">
           <button className="btn btn--primary" onClick={() => navigate('/timer')}>
             Replay
-          </button>
-          <button className="btn" onClick={() => navigate('/')}>
-            Home
           </button>
         </div>
       </section>
