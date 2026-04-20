@@ -94,6 +94,9 @@ export function HomePage() {
   const onSignOut = () => {
     clearProfile()
     setProfile(null)
+    setAuthMode('signin')
+    setAuthPassword('')
+    setError('')
   }
 
   return (
@@ -266,9 +269,14 @@ export function HomePage() {
       {profile ? (
         <footer className="homeSessionFooter">
           <span>Signed in as <strong>{profile.username}</strong></span>
-          <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
-            Sign out
-          </button>
+          <span className="homeSessionFooter__actions">
+            <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
+              Switch account
+            </button>
+            <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
+              Sign out
+            </button>
+          </span>
         </footer>
       ) : null}
     </main>

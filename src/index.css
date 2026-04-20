@@ -173,6 +173,11 @@ h2 { font-size: 1.2rem; }
   text-underline-offset: 2px;
   cursor: pointer;
 }
+.homeSessionFooter__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
 
 .field { display: grid; gap: 6px; font-weight: 600; font-size: 0.93rem; }
 input, select, .btn {
