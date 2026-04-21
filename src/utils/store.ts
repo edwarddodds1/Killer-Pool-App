@@ -36,6 +36,13 @@ type AccountRow = {
   password?: string | null
 }
 
+type LegacyAccountRow = {
+  profile_id: string
+  username: string
+  username_key: string
+  password: string | null
+}
+
 function loadJson<T>(key: string, fallback: T): T {
   const value = localStorage.getItem(key)
   if (!value) return fallback
@@ -89,6 +96,11 @@ type RoomRow = {
 const ROOMS_TABLE = 'killer_rooms'
 const TIMER_SCORES_TABLE = 'timer_pool_scores'
 const ACCOUNTS_TABLE = 'user_accounts'
+
+function formatSupabaseError(prefix: string, message?: string) {
+  if (!message) return prefix
+  return `${prefix} (${message})`
+}
 
 function usernameToKey(username: string) {
   return username.trim().toLowerCase()
@@ -226,10 +238,31 @@ async function getAccountsRemote(usernameKey?: string) {
     query = query.eq('username_key', usernameKey)
   }
 
-  const { data, error } = await query.returns<AccountRow[]>()
+  let { data, error } = await query.returns<AccountRow[]>()
+
+  // Backward compatibility for databases that still have only the legacy `password` column.
+  if (error && /password_hash|password_salt|password_version/i.test(error.message)) {
+    let legacyQuery = client
+      .from(ACCOUNTS_TABLE)
+      .select('profile_id, username, username_key, password')
+    if (usernameKey) {
+      legacyQuery = legacyQuery.eq('username_key', usernameKey)
+    }
+    const legacyResult = await legacyQuery.returns<LegacyAccountRow[]>()
+    error = legacyResult.error
+    data = (legacyResult.data ?? []).map((row) => ({
+      profile_id: row.profile_id,
+      username: row.username,
+      username_key: row.username_key,
+      password_hash: null,
+      password_salt: null,
+      password_version: 0,
+      password: row.password,
+    }))
+  }
 
   if (error || !data) {
-    throw new Error('Could not load account records.')
+    throw new Error(formatSupabaseError('Could not load account records.', error?.message))
   }
   return data.map(normalizeAccountRow)
 }
@@ -283,7 +316,7 @@ export async function registerAccount(username: string, password: string) {
     if (error.message.toLowerCase().includes('duplicate')) {
       throw new Error('Username is already taken.')
     }
-    throw new Error('Could not create account right now.')
+    throw new Error(formatSupabaseError('Could not create account right now.', error.message))
   }
 
   const nextLocal = [...accounts, next]
@@ -385,7 +418,7 @@ export async function getTimerScores() {
     .returns<TimerScoreRow[]>()
 
   if (error || !data) {
-    throw new Error('Could not load cloud leaderboard scores.')
+    throw new Error(formatSupabaseError('Could not load cloud leaderboard scores.', error?.message))
   }
 
   return data.map(normalizeTimerScore)
@@ -407,7 +440,7 @@ export async function addTimerScore(input: Omit<TimerScore, 'createdAt'>) {
   })
   if (error) {
     saveTimerScoresLocal(local)
-    throw new Error('Could not save run to cloud leaderboard.')
+    throw new Error(formatSupabaseError('Could not save run to cloud leaderboard.', error.message))
   }
 }
 

@@ -32,6 +32,8 @@ create table if not exists public.timer_pool_scores (
 );
 
 alter table public.timer_pool_scores enable row level security;
+grant select, insert, delete on table public.timer_pool_scores to anon, authenticated;
+grant usage, select on sequence public.timer_pool_scores_id_seq to anon, authenticated;
 
 drop policy if exists "timer_pool_scores_all_select" on public.timer_pool_scores;
 create policy "timer_pool_scores_all_select"
@@ -99,6 +101,7 @@ end
 $$;
 
 alter table public.user_accounts enable row level security;
+grant select, insert, update on table public.user_accounts to anon, authenticated;
 
 drop policy if exists "user_accounts_all_select" on public.user_accounts;
 create policy "user_accounts_all_select"
@@ -112,4 +115,12 @@ create policy "user_accounts_all_insert"
 on public.user_accounts
 for insert
 to anon, authenticated
+with check (true);
+
+drop policy if exists "user_accounts_all_update" on public.user_accounts;
+create policy "user_accounts_all_update"
+on public.user_accounts
+for update
+to anon, authenticated
+using (true)
 with check (true);
