@@ -389,6 +389,19 @@ export async function signInAccount(username: string, password: string) {
   return { id: account.profileId, username: account.username }
 }
 
+export async function deleteCurrentAccount() {
+  const profile = getProfile()
+  if (!profile) {
+    throw new Error('No signed-in account to delete.')
+  }
+  const client = requireSupabaseForAccounts()
+  const { error } = await client.from(ACCOUNTS_TABLE).delete().eq('profile_id', profile.id)
+  if (error) {
+    throw new Error(formatSupabaseError('Could not delete account right now.', error.message))
+  }
+  clearProfile()
+}
+
 function normalizeTimerScore(row: TimerScoreRow): TimerScore {
   return {
     profileId: row.profile_id,

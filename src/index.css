@@ -168,7 +168,8 @@ h2 { font-size: 1.2rem; }
   background: transparent;
   color: inherit;
   font-size: inherit;
-  padding: 0;
+  min-height: 44px;
+  padding: 10px 8px;
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
@@ -202,7 +203,7 @@ input, select, .btn {
   height: 100%;
   display: block;
 }
-.btn--small { min-height: 36px; font-size: 0.9rem; }
+.btn--small { min-height: 44px; font-size: 0.9rem; }
 .btn--primary { background: #000; color: #fff; }
 .btn--go {
   background: var(--green);
@@ -680,7 +681,9 @@ input, select, .btn {
   background: transparent;
   color: #6d6d6d;
   font-size: 0.78rem;
-  padding: 4px 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px;
   cursor: pointer;
 }
 .timerHomeIcon {
@@ -728,17 +731,18 @@ input, select, .btn {
 .timerRow {
   display: grid;
   grid-template-columns: auto auto 1fr;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 10px 12px;
+  background: #fff;
 }
 .timerRow strong { font-variant-numeric: tabular-nums; }
 .timerRow small {
   justify-self: end;
-  color: var(--muted);
-  font-size: 0.78rem;
+  color: #525252;
+  font-size: 0.82rem;
 }
 .timerRow--leaderboard { grid-template-columns: auto 1fr auto; }
 
@@ -801,26 +805,28 @@ input, select, .btn {
 }
 .timerList--dense { gap: 6px; }
 .timerRow--compact {
-  padding: 6px 8px;
+  padding: 10px 12px;
 }
 .timerRow--leaderboardCompact {
-  padding: 6px 8px;
+  padding: 10px 12px;
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
 .timerRowActions {
   justify-self: end;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 .timerDeleteBtn {
   border: 1px solid var(--border);
   background: #fff;
   border-radius: 8px;
-  font-size: 0.75rem;
+  min-height: 40px;
+  min-width: 68px;
+  font-size: 0.82rem;
   font-weight: 700;
-  color: #5f5f5f;
-  padding: 3px 8px;
+  color: #404040;
+  padding: 8px 12px;
   cursor: pointer;
 }
 .timerDeleteBtn:disabled {
@@ -841,7 +847,8 @@ input, select, .btn {
   cursor: pointer;
 }
 .timerRow--selected {
-  background: #eaeaea;
+  background: #f1f3f6;
+  border-color: #b6bcc6;
 }
 .timerRow--hidden {
   opacity: 0.9;
@@ -855,7 +862,9 @@ input, select, .btn {
   border: 0;
   background: transparent;
   color: #6d6d6d;
-  padding: 2px 6px;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 10px;
   cursor: pointer;
 }
 .timerRowUser { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -868,7 +877,8 @@ input, select, .btn {
   letter-spacing: 0.02em;
   width: fit-content;
   margin: 6px auto 0;
-  padding: 4px 6px;
+  min-height: 44px;
+  padding: 10px 12px;
   cursor: pointer;
 }
 
@@ -958,13 +968,15 @@ input, select, .btn {
   }
   .timerRow {
     grid-template-columns: auto 1fr auto;
-    padding: 7px 8px;
-    font-size: 0.88rem;
+    padding: 10px;
+    font-size: 0.92rem;
     gap: 8px;
   }
-  .timerRow small { font-size: 0.72rem; }
+  .timerRow small { font-size: 0.78rem; }
   .timerDeleteBtn {
-    font-size: 0.7rem;
-    padding: 2px 7px;
+    min-height: 40px;
+    min-width: 64px;
+    font-size: 0.8rem;
+    padding: 7px 10px;
   }
 }

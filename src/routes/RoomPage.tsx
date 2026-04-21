@@ -859,7 +859,6 @@ export function RoomPage() {
                 <span className="resultsStat">Turns</span>
                 <span className="resultsStat">Shots</span>
                 <span className="resultsStat">Pots</span>
-                <span className="resultsStat">Accuracy</span>
               </small>
             </div>
             {resultsOrder.map((player, index) => (
@@ -876,18 +875,6 @@ export function RoomPage() {
                   </span>
                   <span className="resultsStat">
                     <strong>{player.pottedBalls.length}</strong>
-                  </span>
-                  <span className="resultsStat">
-                    <strong>
-                      {Math.round(
-                        player.pottedBalls.length === 0
-                          ? 0
-                          : (player.pottedBalls.length /
-                              ((player.turns ?? 0) + player.pottedBalls.length)) *
-                              100,
-                      )}
-                      %
-                    </strong>
                   </span>
                 </small>
               </div>

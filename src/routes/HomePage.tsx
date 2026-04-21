@@ -12,6 +12,7 @@ import {
   registerAccount,
   saveProfile,
   signInAccount,
+  deleteCurrentAccount,
   upsertRoom,
   upsertRoomRemote,
 } from '../utils/store'
@@ -121,6 +122,22 @@ export function HomePage() {
     setAuthMode('signin')
     setAuthPassword('')
     setError('')
+  }
+
+  const onDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      'Delete your account? This removes your account credentials from this app.',
+    )
+    if (!confirmed) return
+    setError('')
+    try {
+      await deleteCurrentAccount()
+      setProfile(null)
+      setAuthMode('signin')
+      setAuthPassword('')
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Could not delete account.')
+    }
   }
 
   return (
@@ -302,6 +319,9 @@ export function HomePage() {
             </button>
             <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
               Sign out
+            </button>
+            <button type="button" className="homeSessionFooter__signOut" onClick={() => void onDeleteAccount()}>
+              Delete account
             </button>
           </span>
         </footer>
