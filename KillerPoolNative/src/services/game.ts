@@ -98,3 +98,43 @@ export function buildNewRoom(
     eliminationOrder: [],
   };
 }
+
+export function removePlayerFromRoom(room: RoomState, playerId: string): RoomState {
+  if (!room.players.some((p) => p.id === playerId)) {
+    return room;
+  }
+
+  const nextPlayers = room.players.filter((p) => p.id !== playerId);
+  const nextPlayOrder = room.playOrder.filter((id) => id !== playerId);
+  const nextEliminationOrder = room.eliminationOrder.filter((id) => id !== playerId);
+
+  let nextTurnIndex = 0;
+  if (nextPlayOrder.length > 0) {
+    const prevActiveId = room.playOrder[room.turnIndex];
+    if (prevActiveId === playerId) {
+      const len = room.playOrder.length;
+      let found = -1;
+      for (let step = 1; step <= len; step += 1) {
+        const idx = (room.turnIndex + step) % len;
+        const candidate = room.playOrder[idx];
+        if (candidate !== playerId && nextPlayOrder.includes(candidate)) {
+          found = nextPlayOrder.indexOf(candidate);
+          break;
+        }
+      }
+      nextTurnIndex = found >= 0 ? found : 0;
+    } else if (prevActiveId && nextPlayOrder.includes(prevActiveId)) {
+      nextTurnIndex = nextPlayOrder.indexOf(prevActiveId);
+    } else {
+      nextTurnIndex = Math.min(room.turnIndex, nextPlayOrder.length - 1);
+    }
+  }
+
+  return {
+    ...room,
+    players: nextPlayers,
+    playOrder: nextPlayOrder,
+    eliminationOrder: nextEliminationOrder,
+    turnIndex: nextTurnIndex,
+  };
+}

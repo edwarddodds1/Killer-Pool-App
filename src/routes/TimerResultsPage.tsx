@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
+import {
+  formatRecentRunDayMonth,
+  formatTimerElapsedMs,
+  timerScoreBelongsToProfile,
+  timerScoreKey,
+} from '../../shared/timerLeaderboard'
 import { deleteTimerScore, getProfile, getTimerScores } from '../utils/store'
 import { isSupabaseEnabled } from '../lib/supabase'
 
@@ -12,16 +18,46 @@ const ADMIN_PROFILE_IDS = new Set(
     .filter(Boolean),
 )
 
-function formatElapsed(ms: number) {
-  const minutes = Math.floor(ms / 60_000)
-  const seconds = Math.floor((ms % 60_000) / 1_000)
-  const centiseconds = Math.floor((ms % 1_000) / 10)
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`
-}
-
 function formatDateLabel(iso: string) {
   const date = new Date(iso)
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+}
+
+function TimerDeleteIconButton({
+  disabled,
+  busy,
+  onClick,
+  onKeyDown,
+}: {
+  disabled?: boolean
+  busy?: boolean
+  onClick: (e: MouseEvent) => void
+  onKeyDown?: (e: KeyboardEvent) => void
+}) {
+  return (
+    <button
+      type="button"
+      className="timerDeleteBtn timerDeleteBtn--icon"
+      disabled={disabled || busy}
+      aria-label={busy ? 'Deleting' : 'Delete attempt'}
+      title="Delete"
+      onClick={onClick}
+      onKeyDown={onKeyDown}
+    >
+      {busy ? (
+        <span className="timerDeleteBtn__busy" aria-hidden>
+          …
+        </span>
+      ) : (
+        <svg className="timerDeleteIcon" viewBox="0 0 24 24" aria-hidden>
+          <path
+            fill="currentColor"
+            d="M9 3h6a1 1 0 011 1v1h4v2H4V5h4V4a1 1 0 011-1zm1 5h2v9h-2V8zm4 0h2v9h-2V8zM7 8h2v9H7V8zm-3 2h16l-1 10a2 2 0 01-2 2H7a2 2 0 01-2-2L4 10z"
+          />
+        </svg>
+      )}
+    </button>
+  )
 }
 
 export function TimerResultsPage() {
@@ -34,9 +70,6 @@ export function TimerResultsPage() {
   const [deletingRunKey, setDeletingRunKey] = useState<string | null>(null)
 
   const invalidRun = searchParams.get('invalid') === '1'
-
-  const scoreKey = (score: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'>) =>
-    `${score.profileId}__${score.elapsedMs}__${score.createdAt}`
 
   const isAdmin = useMemo(() => {
     if (!profile) return false
@@ -63,7 +96,7 @@ export function TimerResultsPage() {
   const userRuns = useMemo(() => {
     if (!profile) return []
     return scores
-      .filter((s) => s.profileId === profile.id)
+      .filter((s) => timerScoreBelongsToProfile(s, profile))
       .slice()
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   }, [scores, profile])
@@ -94,15 +127,15 @@ export function TimerResultsPage() {
 
   const onDeleteRun = async (score: TimerScore) => {
     if (!profile) return
-    if (!isAdmin && score.profileId !== profile.id) return
-    const runKey = scoreKey(score)
+    if (!isAdmin && !timerScoreBelongsToProfile(score, profile)) return
+    const runKey = timerScoreKey(score)
     const confirmed = window.confirm('Delete this attempt?')
     if (!confirmed) return
 
     setError('')
     setDeletingRunKey(runKey)
     const previous = scores
-    setScores((prev) => prev.filter((run) => scoreKey(run) !== runKey))
+    setScores((prev) => prev.filter((run) => timerScoreKey(run) !== runKey))
     if (selectedRunKey === runKey) {
       setSelectedRunKey(null)
     }
@@ -152,7 +185,7 @@ export function TimerResultsPage() {
             <div className="timerResultsSummary">
               <div className="timerSummaryRow">
                 <span>Best</span>
-                <strong>{userBest ? formatElapsed(userBest.elapsedMs) : '--:--.--'}</strong>
+                <strong>{userBest ? formatTimerElapsedMs(userBest.elapsedMs) : '--:--.--'}</strong>
               </div>
               <div className="timerSummaryRow">
                 <span>Runs</span>
@@ -160,7 +193,7 @@ export function TimerResultsPage() {
               </div>
               <div className="timerSummaryRow">
                 <span>Average</span>
-                <strong>{userAverageMs !== null ? formatElapsed(userAverageMs) : '--:--.--'}</strong>
+                <strong>{userAverageMs !== null ? formatTimerElapsedMs(userAverageMs) : '--:--.--'}</strong>
               </div>
             </div>
             <div className="timerPerformanceLists">
@@ -169,7 +202,7 @@ export function TimerResultsPage() {
                 <div className="timerList timerList--dense">
                   {bestRuns.length ? (
                     bestRuns.map((score, index) => {
-                      const runKey = scoreKey(score)
+                      const runKey = timerScoreKey(score)
                       const isSelected = selectedRunKey === runKey
                       const deleting = deletingRunKey === runKey
                       return (
@@ -184,13 +217,11 @@ export function TimerResultsPage() {
                           }}
                         >
                           <span>#{index + 1}</span>
-                          <strong>{formatElapsed(score.elapsedMs)}</strong>
+                          <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
                           <div className="timerRowActions">
                             {isSelected ? <small>{formatDateLabel(score.createdAt)}</small> : null}
-                            <button
-                              type="button"
-                              className="timerDeleteBtn"
-                              disabled={deleting}
+                            <TimerDeleteIconButton
+                              busy={deleting}
                               onClick={(event) => {
                                 event.stopPropagation()
                                 void onDeleteRun(score)
@@ -198,9 +229,7 @@ export function TimerResultsPage() {
                               onKeyDown={(event) => {
                                 event.stopPropagation()
                               }}
-                            >
-                              {deleting ? 'Deleting...' : 'Delete'}
-                            </button>
+                            />
                           </div>
                         </div>
                       )
@@ -216,13 +245,13 @@ export function TimerResultsPage() {
                 <div className="timerList timerList--dense">
                   {recent5Runs.length ? (
                     recent5Runs.map((score, index) => {
-                      const runKey = scoreKey(score)
+                      const runKey = timerScoreKey(score)
                       const isSelected = selectedRunKey === runKey
                       const deleting = deletingRunKey === runKey
                       return (
                         <div
                           key={runKey}
-                          className={`timerRow timerRow--compact timerRow--selectable ${isSelected ? 'timerRow--selected' : ''}`}
+                          className={`timerRow timerRow--compact timerRow--recent timerRow--selectable ${isSelected ? 'timerRow--selected' : ''}`}
                           role="button"
                           tabIndex={0}
                           onClick={() => setSelectedRunKey(runKey)}
@@ -231,13 +260,11 @@ export function TimerResultsPage() {
                           }}
                         >
                           <span>#{index + 1}</span>
-                          <strong>{formatElapsed(score.elapsedMs)}</strong>
+                          <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
+                          <span className="timerRecentDate">{formatRecentRunDayMonth(score.createdAt)}</span>
                           <div className="timerRowActions">
-                            {isSelected ? <small>{formatDateLabel(score.createdAt)}</small> : null}
-                            <button
-                              type="button"
-                              className="timerDeleteBtn"
-                              disabled={deleting}
+                            <TimerDeleteIconButton
+                              busy={deleting}
                               onClick={(event) => {
                                 event.stopPropagation()
                                 void onDeleteRun(score)
@@ -245,9 +272,7 @@ export function TimerResultsPage() {
                               onKeyDown={(event) => {
                                 event.stopPropagation()
                               }}
-                            >
-                              {deleting ? 'Deleting...' : 'Delete'}
-                            </button>
+                            />
                           </div>
                         </div>
                       )
@@ -265,25 +290,16 @@ export function TimerResultsPage() {
             <div className="timerList">
               {leaderboard.length ? (
                 leaderboard.map((score, index) => {
-                  const runKey = scoreKey(score)
+                  const runKey = timerScoreKey(score)
                   const deleting = deletingRunKey === runKey
                   return (
                     <div key={runKey} className="timerRow timerRow--leaderboardCompact">
                       <span>#{index + 1}</span>
                       <span className="timerRowUser">{score.username}</span>
                       <div className="timerRowActions">
-                        <strong>{formatElapsed(score.elapsedMs)}</strong>
+                        <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
                         {isAdmin ? (
-                          <button
-                            type="button"
-                            className="timerDeleteBtn"
-                            disabled={deleting}
-                            onClick={() => {
-                              void onDeleteRun(score)
-                            }}
-                          >
-                            {deleting ? 'Deleting...' : 'Delete'}
-                          </button>
+                          <TimerDeleteIconButton busy={deleting} onClick={() => void onDeleteRun(score)} />
                         ) : null}
                       </div>
                     </div>

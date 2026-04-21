@@ -6,6 +6,8 @@ export interface Profile {
   id: string
   username: string
   avatarIcon?: string
+  /** Set after register/sign-in when Supabase accounts are used; absent for guests. */
+  sessionId?: string
 }
 
 export interface PlayerState {

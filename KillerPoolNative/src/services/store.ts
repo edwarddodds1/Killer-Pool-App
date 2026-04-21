@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { Profile, RoomState, TimerScore } from '../types/domain';
+import { removePlayerFromRoom } from './game';
 import { supabase } from './supabase';
 
 const ROOMS_KEY = 'killer_pool_rooms_v1';
@@ -8,6 +9,7 @@ const PROFILE_KEY = 'killer_pool_profile_v1';
 const TIMER_SCORES_KEY = 'killer_pool_timer_scores_v1';
 const ROOMS_TABLE = 'killer_rooms';
 const TIMER_SCORES_TABLE = 'timer_pool_scores';
+const ACCOUNTS_TABLE = 'user_accounts';
 
 type RoomIndex = Record<string, RoomState>;
 
@@ -35,6 +37,60 @@ export async function saveProfile(profile: Profile): Promise<void> {
 
 export async function clearProfile(): Promise<void> {
   await AsyncStorage.removeItem(PROFILE_KEY);
+}
+
+export async function fetchActiveSessionIdForProfile(
+  profileId: string,
+): Promise<string | null | undefined> {
+  if (!supabase) return undefined;
+  const { data, error } = await supabase
+    .from(ACCOUNTS_TABLE)
+    .select('active_session_id')
+    .eq('profile_id', profileId)
+    .maybeSingle<{ active_session_id: string | null }>();
+  if (error) return undefined;
+  if (!data) return null;
+  return data.active_session_id ?? null;
+}
+
+async function removePlayerFromEveryStoredRoom(playerId: string): Promise<void> {
+  const rooms = await getRooms();
+  for (const room of Object.values(rooms)) {
+    if (!room.players.some((p) => p.id === playerId)) continue;
+    const next = removePlayerFromRoom(room, playerId);
+    await upsertRoom(next);
+    await upsertRoomRemote(next);
+  }
+}
+
+export async function invalidateLocalAccountSession(playerId: string): Promise<void> {
+  await removePlayerFromEveryStoredRoom(playerId);
+  await clearProfile();
+}
+
+/** Polls Supabase; calls onInvalidated after clearing storage (caller should sync React state / navigation). */
+export function startAccountSessionPolling(
+  getProfileSnapshot: () => Promise<Profile | null>,
+  onInvalidated: () => void | Promise<void>,
+): () => void {
+  const INTERVAL_MS = 4000;
+  const tick = async () => {
+    const profile = await getProfileSnapshot();
+    if (!profile?.sessionId || !supabase) return;
+    const remote = await fetchActiveSessionIdForProfile(profile.id);
+    if (remote === undefined) return;
+    if (remote === null) return;
+    const latest = await getProfileSnapshot();
+    if (!latest?.sessionId || latest.id !== profile.id) return;
+    if (remote === latest.sessionId) return;
+    await invalidateLocalAccountSession(profile.id);
+    await onInvalidated();
+  };
+  const id = globalThis.setInterval(() => {
+    void tick();
+  }, INTERVAL_MS);
+  void tick();
+  return () => globalThis.clearInterval(id);
 }
 
 export async function getRooms(): Promise<RoomIndex> {
@@ -101,4 +157,26 @@ export async function addTimerScore(input: Omit<TimerScore, 'createdAt'>): Promi
     username: input.username,
     elapsed_ms: input.elapsedMs,
   });
+}
+
+export async function deleteTimerScore(
+  input: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'>,
+): Promise<void> {
+  const local = await loadJson<TimerScore[]>(TIMER_SCORES_KEY, []);
+  const nextLocal = local.filter(
+    (score) =>
+      !(
+        score.profileId === input.profileId &&
+        score.elapsedMs === input.elapsedMs &&
+        score.createdAt === input.createdAt
+      ),
+  );
+  await saveJson(TIMER_SCORES_KEY, nextLocal);
+  if (!supabase) return;
+  await supabase
+    .from(TIMER_SCORES_TABLE)
+    .delete()
+    .eq('profile_id', input.profileId)
+    .eq('elapsed_ms', input.elapsedMs)
+    .eq('created_at', input.createdAt);
 }

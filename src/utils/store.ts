@@ -1,5 +1,8 @@
 import type { Profile, RoomState, TimerScore } from '../types'
 import { supabase } from '../lib/supabase'
+import { removePlayerFromRoom } from './game'
+
+export { timerScoreBelongsToProfile } from '../../shared/timerLeaderboard'
 
 const ROOMS_KEY = 'killer_pool_rooms_v1'
 const PROFILE_KEY = 'killer_pool_profile_v1'
@@ -67,6 +70,63 @@ export function saveProfile(profile: Profile) {
 
 export function clearProfile() {
   localStorage.removeItem(PROFILE_KEY)
+}
+
+/** `undefined` = request error (ignore); `null` = no account row. */
+export async function fetchActiveSessionIdForProfile(
+  profileId: string,
+): Promise<string | null | undefined> {
+  if (!supabase) return undefined
+  const { data, error } = await supabase
+    .from(ACCOUNTS_TABLE)
+    .select('active_session_id')
+    .eq('profile_id', profileId)
+    .maybeSingle<{ active_session_id: string | null }>()
+
+  if (error) return undefined
+  if (!data) return null
+  return data.active_session_id ?? null
+}
+
+export function removePlayerFromEveryStoredRoom(playerId: string) {
+  const rooms = getRooms()
+  for (const room of Object.values(rooms)) {
+    if (!room.players.some((p) => p.id === playerId)) continue
+    const next = removePlayerFromRoom(room, playerId)
+    upsertRoom(next)
+    void upsertRoomRemote(next)
+  }
+}
+
+/** Clears profile and removes this player from every cached room (syncs remote). */
+export function invalidateLocalAccountSession(playerId: string) {
+  removePlayerFromEveryStoredRoom(playerId)
+  clearProfile()
+}
+
+export function startAccountSessionWatcher(onInvalidated: () => void): () => void {
+  const INTERVAL_MS = 4000
+  const tick = async () => {
+    const profile = getProfile()
+    if (!profile?.sessionId || !supabase) return
+
+    const remote = await fetchActiveSessionIdForProfile(profile.id)
+    if (remote === undefined) return
+    if (remote === null) return
+
+    const latest = getProfile()
+    if (!latest?.sessionId || latest.id !== profile.id) return
+    if (remote === latest.sessionId) return
+
+    invalidateLocalAccountSession(profile.id)
+    onInvalidated()
+  }
+
+  const id = globalThis.setInterval(() => {
+    void tick()
+  }, INTERVAL_MS)
+  void tick()
+  return () => globalThis.clearInterval(id)
 }
 
 export function getRooms() {
@@ -295,6 +355,7 @@ export async function registerAccount(username: string, password: string) {
   }
 
   const passwordSecret = await createPasswordHash(cleanPassword)
+  const sessionId = crypto.randomUUID()
   const next: AccountRecord = {
     profileId: crypto.randomUUID(),
     username: cleanUsername,
@@ -311,6 +372,7 @@ export async function registerAccount(username: string, password: string) {
     password_hash: next.passwordHash,
     password_salt: next.passwordSalt,
     password_version: next.passwordVersion,
+    active_session_id: sessionId,
   })
   if (error) {
     if (error.message.toLowerCase().includes('duplicate')) {
@@ -321,7 +383,7 @@ export async function registerAccount(username: string, password: string) {
 
   const nextLocal = [...accounts, next]
   saveAccountsLocal(nextLocal)
-  saveProfile({ id: next.profileId, username: next.username })
+  saveProfile({ id: next.profileId, username: next.username, sessionId })
   return { id: next.profileId, username: next.username }
 }
 
@@ -380,11 +442,21 @@ export async function signInAccount(username: string, password: string) {
     throw new Error('Invalid username or password.')
   }
 
+  const sessionId = crypto.randomUUID()
+  const { error: sessionErr } = await client
+    .from(ACCOUNTS_TABLE)
+    .update({ active_session_id: sessionId })
+    .eq('profile_id', account.profileId)
+  if (sessionErr) {
+    throw new Error(formatSupabaseError('Could not start session.', sessionErr.message))
+  }
+
   const existing = getProfile()
   saveProfile({
     id: account.profileId,
     username: account.username,
     avatarIcon: existing?.id === account.profileId ? existing.avatarIcon : undefined,
+    sessionId,
   })
   return { id: account.profileId, username: account.username }
 }

@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { useEffect, useRef } from 'react';
+import { CommonActions, NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -11,10 +11,30 @@ import { JoinScreen } from './src/screens/JoinScreen';
 import { RoomScreen } from './src/screens/RoomScreen';
 import { TimerScreen } from './src/screens/TimerScreen';
 import { LeaderboardScreen } from './src/screens/LeaderboardScreen';
-import { AppProviders } from './src/state/AppProviders';
+import { AppProviders, useAppState } from './src/state/AppProviders';
 import type { RootStackParamList } from './src/types/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+function ProfileSessionNavSync(): React.JSX.Element | null {
+  const navigation = useNavigation();
+  const { profile, hydrated } = useAppState();
+  const hadProfileRef = useRef(false);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    if (profile) {
+      hadProfileRef.current = true;
+      return;
+    }
+    if (hadProfileRef.current) {
+      hadProfileRef.current = false;
+      navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'Home' }] }));
+    }
+  }, [hydrated, profile, navigation]);
+
+  return null;
+}
 
 function App(): React.JSX.Element {
   return (
@@ -23,6 +43,7 @@ function App(): React.JSX.Element {
         <AppProviders>
           <StatusBar barStyle="light-content" />
           <NavigationContainer>
+            <ProfileSessionNavSync />
             <Stack.Navigator
               initialRouteName="Home"
               screenOptions={{

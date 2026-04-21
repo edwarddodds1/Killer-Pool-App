@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 import type { Profile } from '../types/domain';
-import { getProfile, saveProfile as saveProfileStore, clearProfile as clearProfileStore } from '../services/store';
+import {
+  getProfile,
+  saveProfile as saveProfileStore,
+  clearProfile as clearProfileStore,
+  startAccountSessionPolling,
+} from '../services/store';
 
 type AppState = {
   profile: Profile | null;
@@ -23,6 +28,13 @@ export function AppProviders({ children }: { children: React.ReactNode }): React
       setHydrated(true);
     })();
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return undefined;
+    return startAccountSessionPolling(getProfile, async () => {
+      setProfileValue(null);
+    });
+  }, [hydrated]);
 
   const value = useMemo<AppState>(
     () => ({

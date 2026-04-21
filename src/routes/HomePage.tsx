@@ -10,14 +10,13 @@ import {
   getRooms,
   getTimerScores,
   registerAccount,
+  timerScoreBelongsToProfile,
   saveProfile,
   signInAccount,
   deleteCurrentAccount,
   upsertRoom,
   upsertRoomRemote,
 } from '../utils/store'
-
-const MEDAL_ICONS = ['🥇', '🥈', '🥉'] as const
 
 export function HomePage() {
   const navigate = useNavigate()
@@ -29,31 +28,30 @@ export function HomePage() {
   const [mode, setMode] = useState<GameMode>('killer')
   const [killerAllocationMode, setKillerAllocationMode] = useState<KillerAllocationMode>('single')
   const [error, setError] = useState('')
-  const [titleMedals, setTitleMedals] = useState<Array<{ username: string; rank: 1 | 2 | 3 }>>([])
+  const [timerRank, setTimerRank] = useState<number | null>(null)
   const canCreate = useMemo(() => Boolean(profile), [profile])
 
   useEffect(() => {
-    const loadTitleMedals = async () => {
+    const loadTimerRank = async () => {
       if (!profile) {
-        setTitleMedals([])
+        setTimerRank(null)
         return
       }
-      const ranked = (await getTimerScores())
-        .slice()
-        .sort((a, b) => a.elapsedMs - b.elapsedMs)
-        .slice(0, 3)
-      setTitleMedals(
-        ranked
-          .map((score, index) => ({
-            profileId: score.profileId,
-            username: score.username,
-            rank: (index + 1) as 1 | 2 | 3,
-          }))
-          .filter((entry) => entry.profileId === profile.id)
-          .map(({ username, rank }) => ({ username, rank })),
-      )
+      try {
+        const scores = await getTimerScores()
+        const userRuns = scores.filter((s) => timerScoreBelongsToProfile(s, profile))
+        if (!userRuns.length) {
+          setTimerRank(null)
+          return
+        }
+        const userBestMs = Math.min(...userRuns.map((s) => s.elapsedMs))
+        const rank = scores.filter((s) => s.elapsedMs < userBestMs).length + 1
+        setTimerRank(rank)
+      } catch {
+        setTimerRank(null)
+      }
     }
-    void loadTitleMedals()
+    void loadTimerRank()
   }, [profile])
 
   const onAuthSubmit = async (event: FormEvent) => {
@@ -155,13 +153,10 @@ export function HomePage() {
         </div>
         <div className="homeTitleBlock">
           <h1>KILLER POOL</h1>
-          {titleMedals.length ? (
-            <div className="homeTitleMedals" aria-label="Current leaderboard leaders">
-              {titleMedals.map((entry, index) => (
-                <span className="homeMedalTag" key={`${entry.rank}-${entry.username}-${index}`}>
-                  <span aria-hidden="true">{MEDAL_ICONS[entry.rank - 1]}</span> {entry.username}
-                </span>
-              ))}
+          {timerRank != null ? (
+            <div className="homeTimerRankBubble" aria-label="Your timer leaderboard rank">
+              <span className="homeTimerRankBubble__label">Timer pool</span>
+              <span className="homeTimerRankBubble__value">#{timerRank} ranked player</span>
             </div>
           ) : null}
         </div>

@@ -16,6 +16,9 @@ export function JoinPage() {
     const cleanCode = code.replace(/\D/g, '').slice(0, 4)
     const room = (await getRoomRemote(cleanCode)) ?? getRoom(cleanCode)
     if (!room) return setError('No party found for that code.')
+    if (room.status !== 'lobby') {
+      return setError('This party is already in progress and can no longer be joined.')
+    }
     if (!room.players.some((player) => player.id === profile.id)) {
       room.players.push({
         id: profile.id,

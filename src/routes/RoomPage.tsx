@@ -219,6 +219,12 @@ export function RoomPage() {
       .map((player) => player.avatarIcon)
       .filter((icon): icon is string => Boolean(icon)),
   )
+  const isLateJoinLocked =
+    room?.status !== 'lobby' &&
+    Boolean(me) &&
+    (me?.assignedBalls.length ?? 0) === 0 &&
+    (me?.pottedBalls.length ?? 0) === 0 &&
+    (me?.turns ?? 0) === 0
 
   const saveRoom = (next: RoomState, oldCode?: string) => {
     roomSnapshotRef.current = JSON.stringify(next)
@@ -384,6 +390,7 @@ export function RoomPage() {
   }
 
   const toggleReady = () => {
+    if (isLateJoinLocked) return
     applyRoomUpdate((current) => ({
       ...current,
       players: current.players.map((player) =>
@@ -394,6 +401,7 @@ export function RoomPage() {
   }
 
   const startAllocation = () => {
+    if (isLateJoinLocked) return
     const latest = roomRef.current ?? room
     if (!latest) return
     const latestMe = latest.players.find((player) => player.id === me.id)
@@ -417,6 +425,7 @@ export function RoomPage() {
   }
 
   const startOrder = () => {
+    if (isLateJoinLocked) return
     setLocalOrderStarted(true)
     setLocalOrderRunId((current) => current + 1)
     if (room.playOrder.length) {
@@ -443,6 +452,7 @@ export function RoomPage() {
   }
 
   const beginMatch = () => {
+    if (isLateJoinLocked) return
     const nextPlayers = room.players.map((player) => ({ ...player }))
     const firstTurnId = room.playOrder[0]
     const firstTurnPlayer = nextPlayers.find((player) => player.id === firstTurnId)
@@ -453,6 +463,7 @@ export function RoomPage() {
   }
 
   const potBall = (ball: number) => {
+    if (isLateJoinLocked) return
     if (room.sunkBalls.includes(ball) || !currentTurnPlayer) return
     const nextPlayers = room.players.map((player) => ({ ...player }))
     const current = nextPlayers.find((player) => player.id === currentTurnPlayer.id)
@@ -483,8 +494,11 @@ export function RoomPage() {
         room.killerAllocationMode !== 'multi' ||
         currentAllOwnBallsSunk)
 
-    const activeRemaining = nextPlayers.filter((player) => !player.eliminated)
-    const nextStatus = activeRemaining.length <= 1 ? 'results' : room.status
+    const nextSunkBalls = [...room.sunkBalls, ball]
+    const playersWithLiveAssignedBalls = nextPlayers.filter((player) =>
+      player.assignedBalls.some((assignedBall) => !nextSunkBalls.includes(assignedBall)),
+    )
+    const nextStatus = playersWithLiveAssignedBalls.length <= 1 ? 'results' : room.status
     const roomAfterPot = { ...room, players: nextPlayers }
     const nextTurnIndex =
       shouldAutoEndTurn && nextStatus !== 'results'
@@ -502,12 +516,13 @@ export function RoomPage() {
       status: nextStatus,
       players: nextPlayers,
       turnIndex: nextTurnIndex,
-      sunkBalls: [...room.sunkBalls, ball],
+      sunkBalls: nextSunkBalls,
       eliminationOrder: nextEliminationOrder,
     })
   }
 
   const endTurn = () => {
+    if (isLateJoinLocked) return
     const nextTurnIndex = findNextTurn(room, room.turnIndex)
     const nextPlayers = room.players.map((player) => ({ ...player }))
     const nextTurnPlayerId = room.playOrder[nextTurnIndex]
@@ -519,6 +534,7 @@ export function RoomPage() {
   }
 
   const replay = () => {
+    if (isLateJoinLocked) return
     const nextPlayers = room.players.map((player) => ({
       ...player,
       ready: player.isBot ? true : false,
@@ -550,6 +566,7 @@ export function RoomPage() {
   }
 
   const selectAvatarIcon = (icon: string) => {
+    if (isLateJoinLocked) return
     if (takenIcons.has(icon) && me.avatarIcon !== icon) return
     if (me.avatarIcon === icon) return
     saveProfile({ ...profile, avatarIcon: icon })
@@ -560,6 +577,7 @@ export function RoomPage() {
   }
 
   const addRandomBots = () => {
+    if (isLateJoinLocked) return
     if (room.status !== 'lobby') return
     const openSpots = MAX_PLAYERS - room.players.length
     if (openSpots <= 0) return
@@ -598,6 +616,7 @@ export function RoomPage() {
   }
 
   const clearBots = () => {
+    if (isLateJoinLocked) return
     if (room.status !== 'lobby') return
     saveRoom({ ...room, players: room.players.filter((player) => !player.isBot) })
   }
@@ -660,11 +679,22 @@ export function RoomPage() {
             ))}
           </div>
         ) : room.status !== 'inGame' ? (
-          <button className={`btn btn--small ${inviteCopied ? 'btn--copied' : ''}`} onClick={copyInviteLink}>
+          <button
+            className={`btn btn--small ${inviteCopied ? 'btn--copied' : ''}`}
+            onClick={copyInviteLink}
+            disabled={isLateJoinLocked}
+          >
             {inviteCopied ? '✓ Copied' : 'Copy invite link'}
           </button>
         ) : null}
       </header>
+      {isLateJoinLocked ? (
+        <section className="card">
+          <p className="muted">
+            This game is already in progress. You can watch, but only Leave game is available.
+          </p>
+        </section>
+      ) : null}
 
       {room.status === 'lobby' ? (
         <section className="card prepStageCard">
@@ -680,7 +710,7 @@ export function RoomPage() {
                     takenIcons.has(icon) && me.avatarIcon !== icon ? 'avatarPick--taken' : ''
                   } ${me.avatarIcon === icon ? 'avatarPick--selected' : ''}`}
                   onClick={() => selectAvatarIcon(icon)}
-                  disabled={takenIcons.has(icon) && me.avatarIcon !== icon}
+                  disabled={isLateJoinLocked || (takenIcons.has(icon) && me.avatarIcon !== icon)}
                 >
                   {icon}
                 </button>
@@ -707,17 +737,17 @@ export function RoomPage() {
             ))}
           </div>
           <div className="stack">
-            <button className="btn btn--ready" onClick={toggleReady}>
+            <button className="btn btn--ready" onClick={toggleReady} disabled={isLateJoinLocked}>
               {me.ready ? 'Unready' : 'Ready'}
             </button>
-            <button className="btn btn--primary" onClick={startAllocation} disabled={!allReady}>
+            <button className="btn btn--primary" onClick={startAllocation} disabled={isLateJoinLocked || !allReady}>
               Start Ball Allocation
             </button>
             <div className="split">
-              <button className="btn" onClick={addRandomBots} disabled={room.players.length >= MAX_PLAYERS}>
+              <button className="btn" onClick={addRandomBots} disabled={isLateJoinLocked || room.players.length >= MAX_PLAYERS}>
                 Add Bot
               </button>
-              <button className="btn" onClick={clearBots} disabled={botsCount === 0}>
+              <button className="btn" onClick={clearBots} disabled={isLateJoinLocked || botsCount === 0}>
                 Clear bots
               </button>
             </div>
@@ -734,7 +764,7 @@ export function RoomPage() {
               <BallIcon key={ball} ball={ball} large={me.assignedBalls.length <= 1} />
             ))}
           </div>
-          <button className="btn btn--primary" onClick={startOrder}>
+          <button className="btn btn--primary" onClick={startOrder} disabled={isLateJoinLocked}>
             {room.playOrder.length ? 'Open Break and Order' : 'Decide Break and Order'}
           </button>
         </section>
@@ -800,7 +830,7 @@ export function RoomPage() {
               })}
             </div>
           </div>
-          <button className="btn btn--primary" onClick={beginMatch} disabled={!orderAnimationDone}>
+          <button className="btn btn--primary" onClick={beginMatch} disabled={isLateJoinLocked || !orderAnimationDone}>
             Start Match
           </button>
         </section>
@@ -814,7 +844,12 @@ export function RoomPage() {
           </p>
           <div className="ballGrid">
             {Array.from({ length: 15 }, (_, idx) => idx + 1).map((ball) => (
-              <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} onClick={() => potBall(ball)} />
+              <BallIcon
+                key={ball}
+                ball={ball}
+                sunk={room.sunkBalls.includes(ball)}
+                onClick={isLateJoinLocked ? undefined : () => potBall(ball)}
+              />
             ))}
           </div>
           <div className="playersRow">
@@ -834,6 +869,18 @@ export function RoomPage() {
                     <small className="playerMiniName">{player.username}</small>
                     {isTurn ? <small className="turnBadge">TURN</small> : null}
                   </div>
+                  {room.mode !== 'killer' ? (
+                    <div className="playerMiniAssigned">
+                      {player.assignedBalls.map((ball) => (
+                        <BallIcon
+                          key={`assigned-${player.id}-${ball}`}
+                          ball={ball}
+                          sunk={room.sunkBalls.includes(ball)}
+                          showNumber={false}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
                   <div className="playerMiniPots">
                     {player.pottedBalls.map((ball, index) => (
                       <BallIcon key={`${ball}-${index}`} ball={ball} showNumber={false} />
@@ -843,7 +890,7 @@ export function RoomPage() {
               )
             })}
           </div>
-          <button className="btn btn--danger" onClick={endTurn}>
+          <button className="btn btn--danger" onClick={endTurn} disabled={isLateJoinLocked}>
             End {currentTurnPlayer?.username ?? 'player'}'s turn
           </button>
         </section>
@@ -857,7 +904,6 @@ export function RoomPage() {
               <span />
               <small className="resultsStats resultsStats--head">
                 <span className="resultsStat">Turns</span>
-                <span className="resultsStat">Shots</span>
                 <span className="resultsStat">Pots</span>
               </small>
             </div>
@@ -871,9 +917,6 @@ export function RoomPage() {
                     <strong>{player.turns ?? 0}</strong>
                   </span>
                   <span className="resultsStat">
-                    <strong>{(player.turns ?? 0) + player.pottedBalls.length}</strong>
-                  </span>
-                  <span className="resultsStat">
                     <strong>{player.pottedBalls.length}</strong>
                   </span>
                 </small>
@@ -881,10 +924,10 @@ export function RoomPage() {
             ))}
           </div>
           <div className="split">
-            <button className="btn btn--primary" onClick={replay}>
+            <button className="btn btn--primary" onClick={replay} disabled={isLateJoinLocked}>
               Replay
             </button>
-            <button className="btn" onClick={() => navigate('/')}>
+            <button className="btn" onClick={() => navigate('/')} disabled={isLateJoinLocked}>
               Quit
             </button>
           </div>

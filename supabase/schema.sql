@@ -82,6 +82,10 @@ alter table public.user_accounts
 alter table public.user_accounts
   alter column password drop not null;
 
+-- Single active session per account: new login overwrites this; other clients poll and sign out.
+alter table public.user_accounts
+  add column if not exists active_session_id text;
+
 do $$
 begin
   if not exists (

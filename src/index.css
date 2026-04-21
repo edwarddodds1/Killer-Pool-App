@@ -87,21 +87,31 @@ h1 {
 }
 h1, h2, p { margin: 0; }
 h2 { font-size: 1.2rem; }
-.homeTitleMedals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.homeMedalTag {
+.homeTimerRankBubble {
   display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 8px;
+  max-width: 100%;
+  padding: 4px 10px;
+  border-radius: 10px;
   border: 1px solid #111;
-  background: #fff;
-  font-size: 0.72rem;
-  font-weight: 700;
+  background: #f7f7f7;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+  width: fit-content;
+}
+.homeTimerRankBubble__label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #444;
+  line-height: 1;
+}
+.homeTimerRankBubble__value {
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
 
@@ -395,10 +405,10 @@ input, select, .btn {
 }
 .resultsStats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(56px, auto));
+  grid-template-columns: repeat(2, minmax(64px, auto));
   align-items: center;
   justify-items: end;
-  column-gap: 14px;
+  column-gap: 20px;
   margin-left: auto;
 }
 .resultsStat {
@@ -545,6 +555,22 @@ input, select, .btn {
   text-overflow: ellipsis;
 }
 
+.playerMiniAssigned {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 22px;
+  justify-content: center;
+}
+.playerMiniAssigned .ball {
+  width: 18px;
+  height: 18px;
+  border-width: 1px;
+}
+.playerMiniAssigned .ball .ball__face {
+  border-width: 1px;
+}
+
 .playerMiniPots { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; justify-content: center; }
 .playerMiniPots .ball { width: 20px; border-width: 2px; }
 .playerMiniPots .ball { height: 20px; }
@@ -667,14 +693,22 @@ input, select, .btn {
 .timerCard--main {
   min-height: calc(100vh - 140px);
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto auto 1fr auto;
   align-items: center;
   position: relative;
+}
+.timerTitle {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(2.3rem, 8.5vw, 3.35rem);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1;
 }
 .timerHeader {
   position: absolute;
   top: 12px;
-  left: 12px;
+  right: 12px;
 }
 .timerHomeBtn {
   border: 0;
@@ -705,6 +739,11 @@ input, select, .btn {
   border-radius: 12px;
   background: #f7f7f7;
 }
+.timerDisplayWrap {
+  width: 100%;
+  display: grid;
+  align-self: center;
+}
 .timerDisplay__group {
   display: inline-block;
   min-width: 2.1ch;
@@ -727,6 +766,35 @@ input, select, .btn {
   gap: 10px;
 }
 .timerControls .btn { min-height: 66px; font-size: 1.1rem; width: 100%; }
+.timerRules {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f7f7f7;
+  padding: 8px 10px;
+  display: grid;
+  gap: 4px;
+}
+.timerRules__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.timerRules__list {
+  margin: 0;
+  padding-left: 1.15rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--muted);
+  display: grid;
+  gap: 6px;
+}
+.timerRules__list li {
+  margin: 0;
+  padding-left: 0.15rem;
+}
 .timerList { display: grid; gap: 8px; }
 .timerRow {
   display: grid;
@@ -811,6 +879,15 @@ input, select, .btn {
   padding: 10px 12px;
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
+.timerRow--recent {
+  grid-template-columns: auto auto auto minmax(40px, 1fr);
+}
+.timerRecentDate {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #9ca3af;
+  white-space: nowrap;
+}
 .timerRowActions {
   justify-self: end;
   display: inline-flex;
@@ -832,6 +909,33 @@ input, select, .btn {
 .timerDeleteBtn:disabled {
   opacity: 0.65;
   cursor: not-allowed;
+}
+.timerDeleteBtn--icon {
+  min-width: 36px;
+  min-height: 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #dc2626;
+}
+.timerDeleteBtn--icon:disabled {
+  opacity: 0.55;
+}
+.timerDeleteIcon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+.timerDeleteBtn__busy {
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #dc2626;
 }
 
 .timerPerformanceLists {
@@ -904,9 +1008,15 @@ input, select, .btn {
   h1 {
     font-size: clamp(2.15rem, 9vw, 2.85rem);
   }
-  .homeMedalTag {
-    font-size: 0.66rem;
-    padding: 2px 6px;
+  .homeTimerRankBubble {
+    padding: 3px 8px;
+    gap: 4px 6px;
+  }
+  .homeTimerRankBubble__label {
+    font-size: 0.58rem;
+  }
+  .homeTimerRankBubble__value {
+    font-size: 0.68rem;
   }
   .card { padding: 12px; gap: 10px; }
   .split { grid-template-columns: 1fr; }
@@ -936,13 +1046,16 @@ input, select, .btn {
   .playerMiniName { font-size: 0.62rem; }
   .playersRow { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .playerMiniCard { padding: 6px; gap: 4px; }
+  .playerMiniAssigned { gap: 2px; min-height: 16px; }
+  .playerMiniAssigned .ball { width: 14px; height: 14px; border-width: 1px; }
+  .playerMiniAssigned .ball .ball__face { border-width: 1px; }
   .playerMiniPots { gap: 2px; min-height: 16px; }
   .playerMiniPots .ball { width: 14px; height: 14px; border-width: 1px; }
   .playerMiniPots .ball .ball__face { border-width: 1px; }
   .playerMiniPots .ball .ball__face span { font-size: 0.36rem; }
   .resultsStats {
-    grid-template-columns: repeat(4, minmax(40px, 1fr));
-    column-gap: 8px;
+    grid-template-columns: repeat(2, minmax(56px, 1fr));
+    column-gap: 14px;
     font-size: 0.74rem;
   }
   .resultsHeaderRow { padding-top: 0; }
@@ -953,9 +1066,22 @@ input, select, .btn {
   .timerCard--main { min-height: calc(100vh - 160px); }
   .timerHomeBtn { font-size: 0.74rem; }
   .timerHomeIcon { width: 16px; height: 16px; }
+  .timerTitle {
+    font-size: clamp(2.15rem, 9vw, 2.85rem);
+  }
   .timerDisplay__group { min-width: 2ch; }
   .timerDisplay__separator { margin: 0 0.16ch; }
   .timerControls .btn { min-height: 58px; }
+  .timerRules {
+    padding: 7px 8px;
+  }
+  .timerRules__title {
+    font-size: 0.76rem;
+  }
+  .timerRules__list {
+    font-size: 0.76rem;
+    gap: 5px;
+  }
   .timerResultsGrid { grid-template-columns: 1fr; }
   .timerResultsActions { grid-template-columns: 1fr; }
   .timerResultsTitle {
@@ -972,11 +1098,28 @@ input, select, .btn {
     font-size: 0.92rem;
     gap: 8px;
   }
+  .timerRow--recent {
+    grid-template-columns: auto auto auto minmax(36px, 1fr);
+    gap: 6px;
+  }
+  .timerRecentDate {
+    font-size: 0.72rem;
+  }
   .timerRow small { font-size: 0.78rem; }
-  .timerDeleteBtn {
+  .timerDeleteBtn:not(.timerDeleteBtn--icon) {
     min-height: 40px;
     min-width: 64px;
     font-size: 0.8rem;
     padding: 7px 10px;
+  }
+  .timerDeleteBtn--icon {
+    min-width: 34px;
+    min-height: 34px;
+    width: 34px;
+    height: 34px;
+  }
+  .timerDeleteIcon {
+    width: 16px;
+    height: 16px;
   }
 }

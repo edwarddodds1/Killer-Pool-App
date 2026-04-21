@@ -86,6 +86,7 @@ export function TimerPoolPage() {
   return (
     <main className="page timerPage">
       <section className="card timerCard timerCard--main">
+        <h1 className="timerTitle">Timer</h1>
         <div className="timerHeader">
           <button className="timerHomeBtn" onClick={() => navigate('/')} aria-label="Home">
             <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
@@ -96,12 +97,14 @@ export function TimerPoolPage() {
             </svg>
           </button>
         </div>
-        <div className="timerDisplay" aria-live="polite">
-          <span className="timerDisplay__group">{elapsedParts.minutes}</span>
-          <span className="timerDisplay__separator">:</span>
-          <span className="timerDisplay__group">{elapsedParts.seconds}</span>
-          <span className="timerDisplay__separator">.</span>
-          <span className="timerDisplay__group timerDisplay__group--centi">{elapsedParts.centiseconds}</span>
+        <div className="timerDisplayWrap">
+          <div className="timerDisplay" aria-live="polite">
+            <span className="timerDisplay__group">{elapsedParts.minutes}</span>
+            <span className="timerDisplay__separator">:</span>
+            <span className="timerDisplay__group">{elapsedParts.seconds}</span>
+            <span className="timerDisplay__separator">.</span>
+            <span className="timerDisplay__group timerDisplay__group--centi">{elapsedParts.centiseconds}</span>
+          </div>
         </div>
         <div className="timerControls">
           {runningSince === null ? (
@@ -117,6 +120,14 @@ export function TimerPoolPage() {
             Finish
           </button>
         </div>
+        <section className="timerRules" aria-label="Timer rules">
+          <h2 className="timerRules__title">Rules</h2>
+          <ul className="timerRules__list">
+            <li>Pot all balls as quick as possible.</li>
+            <li>All balls must be stationary between shots.</li>
+            <li>Potting the white is a restart from the line.</li>
+          </ul>
+        </section>
         {error ? <p className="error">{error}</p> : null}
       </section>
     </main>
