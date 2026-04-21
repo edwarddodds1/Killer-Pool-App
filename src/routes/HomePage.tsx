@@ -33,19 +33,27 @@ export function HomePage() {
 
   useEffect(() => {
     const loadTitleMedals = async () => {
+      if (!profile) {
+        setTitleMedals([])
+        return
+      }
       const ranked = (await getTimerScores())
         .slice()
         .sort((a, b) => a.elapsedMs - b.elapsedMs)
         .slice(0, 3)
       setTitleMedals(
-        ranked.map((score, index) => ({
-          username: score.username,
-          rank: (index + 1) as 1 | 2 | 3,
-        })),
+        ranked
+          .map((score, index) => ({
+            profileId: score.profileId,
+            username: score.username,
+            rank: (index + 1) as 1 | 2 | 3,
+          }))
+          .filter((entry) => entry.profileId === profile.id)
+          .map(({ username, rank }) => ({ username, rank })),
       )
     }
     void loadTitleMedals()
-  }, [])
+  }, [profile])
 
   const onAuthSubmit = async (event: FormEvent) => {
     event.preventDefault()

@@ -46,9 +46,14 @@ export function TimerResultsPage() {
   const supabaseEnabled = isSupabaseEnabled()
 
   const loadScores = async () => {
-    const nextScores = await getTimerScores()
-    setScores(nextScores)
-    setSelectedRunKey(null)
+    setError('')
+    try {
+      const nextScores = await getTimerScores()
+      setScores(nextScores)
+      setSelectedRunKey(null)
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Could not load leaderboard.')
+    }
   }
 
   useEffect(() => {

@@ -22,6 +22,7 @@ export function TimerPoolPage() {
   const [elapsedMs, setElapsedMs] = useState(0)
   const [saving, setSaving] = useState(false)
   const [runFinalized, setRunFinalized] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     if (!profile) {
@@ -59,6 +60,7 @@ export function TimerPoolPage() {
     if (!profile || elapsedMs <= 0 || saving) return
     const finalElapsed = runningSince === null ? elapsedMs : Date.now() - runningSince
     const isValidRun = finalElapsed >= MIN_VALID_TIMER_RUN_MS
+    setError('')
     setRunningSince(null)
     setElapsedMs(finalElapsed)
     setSaving(true)
@@ -72,6 +74,8 @@ export function TimerPoolPage() {
       }
       setRunFinalized(true)
       navigate(isValidRun ? '/timer/results' : '/timer/results?invalid=1')
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Could not save run.')
     } finally {
       setSaving(false)
     }
@@ -113,6 +117,7 @@ export function TimerPoolPage() {
             Finish
           </button>
         </div>
+        {error ? <p className="error">{error}</p> : null}
       </section>
     </main>
   )

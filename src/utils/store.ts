@@ -20,14 +20,20 @@ type AccountRecord = {
   profileId: string
   username: string
   usernameKey: string
-  password: string
+  passwordHash: string
+  passwordSalt: string
+  passwordVersion: number
+  legacyPassword?: string
 }
 
 type AccountRow = {
   profile_id: string
   username: string
   username_key: string
-  password: string
+  password_hash: string | null
+  password_salt: string | null
+  password_version: number | null
+  password?: string | null
 }
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -88,12 +94,93 @@ function usernameToKey(username: string) {
   return username.trim().toLowerCase()
 }
 
+function requireSupabaseForAccounts() {
+  if (!supabase) {
+    throw new Error('Account service is unavailable. Please try again later.')
+  }
+  return supabase
+}
+
+function toBase64(bytes: Uint8Array) {
+  let binary = ''
+  for (const value of bytes) binary += String.fromCharCode(value)
+  return btoa(binary)
+}
+
+function fromBase64(value: string) {
+  const binary = atob(value)
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0))
+}
+
+function getCrypto() {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('Secure password support is unavailable in this browser.')
+  }
+  return globalThis.crypto
+}
+
+async function createPasswordHash(password: string, saltInput?: string) {
+  const cryptoRef = getCrypto()
+  const encoder = new TextEncoder()
+  const saltBytes = saltInput
+    ? fromBase64(saltInput)
+    : cryptoRef.getRandomValues(new Uint8Array(16))
+  const keyMaterial = await cryptoRef.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    { name: 'PBKDF2' },
+    false,
+    ['deriveBits'],
+  )
+  const derived = await cryptoRef.subtle.deriveBits(
+    {
+      name: 'PBKDF2',
+      hash: 'SHA-256',
+      salt: saltBytes,
+      iterations: 120000,
+    },
+    keyMaterial,
+    256,
+  )
+  const hashBytes = new Uint8Array(derived)
+  return {
+    hash: toBase64(hashBytes),
+    salt: toBase64(saltBytes),
+    version: 1,
+  }
+}
+
+async function verifyPassword(password: string, account: AccountRecord) {
+  const next = await createPasswordHash(password, account.passwordSalt)
+  return next.hash === account.passwordHash
+}
+
 function normalizeAccountRow(row: AccountRow): AccountRecord {
+  if (row.password_hash && row.password_salt) {
+    return {
+      profileId: row.profile_id,
+      username: row.username,
+      usernameKey: row.username_key,
+      passwordHash: row.password_hash,
+      passwordSalt: row.password_salt,
+      passwordVersion: row.password_version ?? 1,
+    }
+  }
+
+  const legacyPassword = row.password?.trim()
+  if (!legacyPassword) {
+    throw new Error('Account record is missing password credentials.')
+  }
+
   return {
     profileId: row.profile_id,
     username: row.username,
     usernameKey: row.username_key,
-    password: row.password,
+    // Placeholder hash values are replaced during legacy password migration.
+    passwordHash: legacyPassword,
+    passwordSalt: '',
+    passwordVersion: 0,
+    legacyPassword,
   }
 }
 
@@ -130,10 +217,10 @@ function saveAccountsLocal(accounts: AccountRecord[]) {
 }
 
 async function getAccountsRemote(usernameKey?: string) {
-  if (!supabase) return null
-  let query = supabase
+  const client = requireSupabaseForAccounts()
+  let query = client
     .from(ACCOUNTS_TABLE)
-    .select('profile_id, username, username_key, password')
+    .select('profile_id, username, username_key, password_hash, password_salt, password_version, password')
 
   if (usernameKey) {
     query = query.eq('username_key', usernameKey)
@@ -141,14 +228,14 @@ async function getAccountsRemote(usernameKey?: string) {
 
   const { data, error } = await query.returns<AccountRow[]>()
 
-  if (error || !data) return null
+  if (error || !data) {
+    throw new Error('Could not load account records.')
+  }
   return data.map(normalizeAccountRow)
 }
 
 async function getAccounts() {
-  const local = getAccountsLocal()
   const remote = await getAccountsRemote()
-  if (!remote) return local
   saveAccountsLocal(remote)
   return remote
 }
@@ -165,6 +252,7 @@ function validateAccountInput(username: string, password: string) {
 
 export async function registerAccount(username: string, password: string) {
   validateAccountInput(username, password)
+  const client = requireSupabaseForAccounts()
   const cleanUsername = username.trim()
   const cleanPassword = password.trim()
   const usernameKey = usernameToKey(cleanUsername)
@@ -173,26 +261,29 @@ export async function registerAccount(username: string, password: string) {
     throw new Error('Username is already taken.')
   }
 
+  const passwordSecret = await createPasswordHash(cleanPassword)
   const next: AccountRecord = {
     profileId: crypto.randomUUID(),
     username: cleanUsername,
     usernameKey,
-    password: cleanPassword,
+    passwordHash: passwordSecret.hash,
+    passwordSalt: passwordSecret.salt,
+    passwordVersion: passwordSecret.version,
   }
 
-  if (supabase) {
-    const { error } = await supabase.from(ACCOUNTS_TABLE).insert({
-      profile_id: next.profileId,
-      username: next.username,
-      username_key: next.usernameKey,
-      password: next.password,
-    })
-    if (error) {
-      if (error.message.toLowerCase().includes('duplicate')) {
-        throw new Error('Username is already taken.')
-      }
-      throw new Error('Could not create account right now.')
+  const { error } = await client.from(ACCOUNTS_TABLE).insert({
+    profile_id: next.profileId,
+    username: next.username,
+    username_key: next.usernameKey,
+    password_hash: next.passwordHash,
+    password_salt: next.passwordSalt,
+    password_version: next.passwordVersion,
+  })
+  if (error) {
+    if (error.message.toLowerCase().includes('duplicate')) {
+      throw new Error('Username is already taken.')
     }
+    throw new Error('Could not create account right now.')
   }
 
   const nextLocal = [...accounts, next]
@@ -203,6 +294,7 @@ export async function registerAccount(username: string, password: string) {
 
 export async function signInAccount(username: string, password: string) {
   validateAccountInput(username, password)
+  const client = requireSupabaseForAccounts()
   const cleanUsername = username.trim()
   const cleanPassword = password.trim()
   const usernameKey = usernameToKey(cleanUsername)
@@ -224,9 +316,33 @@ export async function signInAccount(username: string, password: string) {
     )
   }
 
-  const matchesPassword = Boolean(
-    account && (account.password === cleanPassword || account.password.trim() === cleanPassword),
-  )
+  if (account && account.passwordVersion === 0 && account.legacyPassword === cleanPassword) {
+    const migrated = await createPasswordHash(cleanPassword)
+    const { error } = await client
+      .from(ACCOUNTS_TABLE)
+      .update({
+        password_hash: migrated.hash,
+        password_salt: migrated.salt,
+        password_version: migrated.version,
+      })
+      .eq('profile_id', account.profileId)
+    if (!error) {
+      account = {
+        ...account,
+        passwordHash: migrated.hash,
+        passwordSalt: migrated.salt,
+        passwordVersion: migrated.version,
+        legacyPassword: undefined,
+      }
+    }
+  }
+
+  const matchesPassword =
+    account?.passwordVersion === 0
+      ? account.legacyPassword === cleanPassword
+      : account
+        ? await verifyPassword(cleanPassword, account)
+        : false
   if (!account || !matchesPassword) {
     throw new Error('Invalid username or password.')
   }
@@ -269,7 +385,7 @@ export async function getTimerScores() {
     .returns<TimerScoreRow[]>()
 
   if (error || !data) {
-    return local
+    throw new Error('Could not load cloud leaderboard scores.')
   }
 
   return data.map(normalizeTimerScore)
@@ -284,11 +400,15 @@ export async function addTimerScore(input: Omit<TimerScore, 'createdAt'>) {
   saveTimerScoresLocal([...local, nextLocalScore])
 
   if (!supabase) return
-  await supabase.from(TIMER_SCORES_TABLE).insert({
+  const { error } = await supabase.from(TIMER_SCORES_TABLE).insert({
     profile_id: input.profileId,
     username: input.username,
     elapsed_ms: input.elapsedMs,
   })
+  if (error) {
+    saveTimerScoresLocal(local)
+    throw new Error('Could not save run to cloud leaderboard.')
+  }
 }
 
 export async function deleteTimerScore(input: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'>) {

@@ -58,9 +58,45 @@ create table if not exists public.user_accounts (
   profile_id text primary key,
   username text not null,
   username_key text not null unique,
-  password text not null,
+  password_hash text,
+  password_salt text,
+  password_version integer not null default 1,
+  password text,
   created_at timestamptz not null default now()
 );
+
+alter table public.user_accounts
+  add column if not exists password_hash text;
+
+alter table public.user_accounts
+  add column if not exists password_salt text;
+
+alter table public.user_accounts
+  add column if not exists password_version integer not null default 1;
+
+alter table public.user_accounts
+  add column if not exists password text;
+
+alter table public.user_accounts
+  alter column password drop not null;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'user_accounts_password_presence_check'
+      and conrelid = 'public.user_accounts'::regclass
+  ) then
+    alter table public.user_accounts
+      add constraint user_accounts_password_presence_check
+      check (
+        (password_hash is not null and password_salt is not null)
+        or password is not null
+      );
+  end if;
+end
+$$;
 
 alter table public.user_accounts enable row level security;
 
