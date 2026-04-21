@@ -41,4 +41,6 @@ export interface TimerScore {
   username: string
   elapsedMs: number
   createdAt: string
+  /** Local-only: not yet confirmed on Supabase (offline or failed upload). */
+  pendingSync?: boolean
 }

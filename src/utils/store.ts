@@ -1,6 +1,7 @@
 import type { Profile, RoomState, TimerScore } from '../types'
 import { supabase } from '../lib/supabase'
 import { removePlayerFromRoom } from './game'
+import { timerScoreKey } from '../../shared/timerLeaderboard'
 
 export { timerScoreBelongsToProfile } from '../../shared/timerLeaderboard'
 
@@ -483,6 +484,39 @@ function normalizeTimerScore(row: TimerScoreRow): TimerScore {
   }
 }
 
+function sortTimerScores(scores: TimerScore[]): TimerScore[] {
+  return scores.slice().sort((a, b) => {
+    if (a.elapsedMs !== b.elapsedMs) return a.elapsedMs - b.elapsedMs
+    return a.createdAt.localeCompare(b.createdAt)
+  })
+}
+
+/** Match pending local rows to cloud rows (same client `created_at` we send on insert). */
+function reconcileLocalScores(local: TimerScore[], remote: TimerScore[]): TimerScore[] {
+  const remoteKeys = new Set(remote.map((r) => timerScoreKey(r)))
+  return local.map((entry) => {
+    if (entry.pendingSync && remoteKeys.has(timerScoreKey(entry))) {
+      const match = remote.find((r) => timerScoreKey(r) === timerScoreKey(entry))
+      if (match) return { ...match, pendingSync: false }
+    }
+    return entry
+  })
+}
+
+/** Leaderboard view: server rows plus any runs still waiting to upload. */
+function mergeRemoteWithPending(remote: TimerScore[], local: TimerScore[]): TimerScore[] {
+  const byKey = new Map<string, TimerScore>()
+  for (const r of remote) {
+    byKey.set(timerScoreKey(r), { ...r, pendingSync: false })
+  }
+  for (const l of local) {
+    if (l.pendingSync && !byKey.has(timerScoreKey(l))) {
+      byKey.set(timerScoreKey(l), l)
+    }
+  }
+  return sortTimerScores([...byKey.values()])
+}
+
 export function getTimerScoresLocal() {
   return loadJson<TimerScore[]>(TIMER_SCORES_KEY, [])
 }
@@ -491,11 +525,59 @@ export function saveTimerScoresLocal(scores: TimerScore[]) {
   saveJson(TIMER_SCORES_KEY, scores)
 }
 
-export async function getTimerScores() {
-  const local = getTimerScoresLocal()
+let flushTimerScoresInFlight = false
+
+/** Push pending local runs to Supabase; returns how many uploads succeeded. */
+export async function flushPendingTimerScores(): Promise<number> {
+  if (!supabase || flushTimerScoresInFlight) return 0
+  flushTimerScoresInFlight = true
+  let syncedCount = 0
+  try {
+    for (;;) {
+      const pending = getTimerScoresLocal().filter((s) => s.pendingSync)
+      if (!pending.length) break
+
+      let progressed = false
+      for (const score of pending) {
+        const key = timerScoreKey(score)
+        const { data, error } = await supabase
+          .from(TIMER_SCORES_TABLE)
+          .insert({
+            profile_id: score.profileId,
+            username: score.username,
+            elapsed_ms: score.elapsedMs,
+            created_at: score.createdAt,
+          })
+          .select('profile_id, username, elapsed_ms, created_at')
+          .maybeSingle()
+
+        if (error || !data) continue
+
+        syncedCount += 1
+        const normalized = { ...normalizeTimerScore(data as TimerScoreRow), pendingSync: false }
+        const current = getTimerScoresLocal()
+        const next = current.filter((s) => timerScoreKey(s) !== key)
+        next.push(normalized)
+        saveTimerScoresLocal(sortTimerScores(next))
+        progressed = true
+        break
+      }
+
+      if (!progressed) break
+    }
+    return syncedCount
+  } finally {
+    flushTimerScoresInFlight = false
+  }
+}
+
+export async function getTimerScores(): Promise<TimerScore[]> {
+  const local = sortTimerScores(getTimerScoresLocal())
+
   if (!supabase) {
     return local
   }
+
   const { data, error } = await supabase
     .from(TIMER_SCORES_TABLE)
     .select('profile_id, username, elapsed_ms, created_at')
@@ -503,30 +585,46 @@ export async function getTimerScores() {
     .returns<TimerScoreRow[]>()
 
   if (error || !data) {
-    throw new Error(formatSupabaseError('Could not load cloud leaderboard scores.', error?.message))
+    return local
   }
 
-  return data.map(normalizeTimerScore)
+  const remote = data.map((row) => normalizeTimerScore(row))
+  const reconciled = reconcileLocalScores(local, remote)
+  const merged = mergeRemoteWithPending(remote, reconciled)
+  saveTimerScoresLocal(merged)
+  return merged
 }
 
-export async function addTimerScore(input: Omit<TimerScore, 'createdAt'>) {
+export async function addTimerScore(input: Omit<TimerScore, 'createdAt' | 'pendingSync'>) {
   const nextLocalScore: TimerScore = {
     ...input,
     createdAt: new Date().toISOString(),
+    pendingSync: true,
   }
   const local = getTimerScoresLocal()
-  saveTimerScoresLocal([...local, nextLocalScore])
+  saveTimerScoresLocal(sortTimerScores([...local, nextLocalScore]))
 
   if (!supabase) return
-  const { error } = await supabase.from(TIMER_SCORES_TABLE).insert({
-    profile_id: input.profileId,
-    username: input.username,
-    elapsed_ms: input.elapsedMs,
-  })
-  if (error) {
-    saveTimerScoresLocal(local)
-    throw new Error(formatSupabaseError('Could not save run to cloud leaderboard.', error.message))
+
+  const { data, error } = await supabase
+    .from(TIMER_SCORES_TABLE)
+    .insert({
+      profile_id: input.profileId,
+      username: input.username,
+      elapsed_ms: input.elapsedMs,
+      created_at: nextLocalScore.createdAt,
+    })
+    .select('profile_id, username, elapsed_ms, created_at')
+    .maybeSingle()
+
+  if (error || !data) {
+    return
   }
+
+  const synced = { ...normalizeTimerScore(data as TimerScoreRow), pendingSync: false }
+  const latest = getTimerScoresLocal()
+  const without = latest.filter((s) => timerScoreKey(s) !== timerScoreKey(nextLocalScore))
+  saveTimerScoresLocal(sortTimerScores([...without, synced]))
 }
 
 export async function deleteTimerScore(input: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'>) {

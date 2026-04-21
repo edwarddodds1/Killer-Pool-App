@@ -8,6 +8,7 @@ import {
   getProfile,
   getRoomRemote,
   getRooms,
+  flushPendingTimerScores,
   getTimerScores,
   registerAccount,
   timerScoreBelongsToProfile,
@@ -38,6 +39,7 @@ export function HomePage() {
         return
       }
       try {
+        await flushPendingTimerScores()
         const scores = await getTimerScores()
         const userRuns = scores.filter((s) => timerScoreBelongsToProfile(s, profile))
         if (!userRuns.length) {

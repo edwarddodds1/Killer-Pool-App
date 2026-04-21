@@ -7,7 +7,7 @@ import {
   timerScoreBelongsToProfile,
   timerScoreKey,
 } from '../../shared/timerLeaderboard'
-import { deleteTimerScore, getProfile, getTimerScores } from '../utils/store'
+import { deleteTimerScore, flushPendingTimerScores, getProfile, getTimerScores } from '../utils/store'
 import { isSupabaseEnabled } from '../lib/supabase'
 
 const ADMIN_USERNAMES = new Set(['edwarddodds1'])
@@ -103,6 +103,7 @@ export function TimerResultsPage() {
   const loadScores = async () => {
     setError('')
     try {
+      await flushPendingTimerScores()
       const nextScores = await getTimerScores()
       setScores(nextScores)
       setSelectedRunKey(null)
@@ -140,6 +141,8 @@ export function TimerResultsPage() {
     // Keep all records, but only render top 10 fastest.
     return allRankedRuns.slice(0, 10)
   }, [allRankedRuns])
+
+  const hasPendingSync = useMemo(() => scores.some((s) => s.pendingSync), [scores])
 
   const bestRuns = userRuns
     .slice()
@@ -204,6 +207,11 @@ export function TimerResultsPage() {
               <p className="muted">Cloud leaderboard is not connected on this deployment yet.</p>
             ) : null}
             {error ? <p className="error">{error}</p> : null}
+            {hasPendingSync && supabaseEnabled ? (
+              <p className="muted">
+                Some runs are saved on this device only and will upload when you are online.
+              </p>
+            ) : null}
             <div className="timerResultsSummary">
               <div className="timerSummaryRow">
                 <span>Best</span>
