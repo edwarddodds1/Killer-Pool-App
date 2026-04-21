@@ -1,1 +1,1 @@
-export const AVATAR_ICONS = ['🎱', '🦈', '🔥', '⚡', '👑', '🎯', '🧊', '🐯'] as const
+export const AVATAR_ICONS = ['🚀', '🦈', '🔥', '⚡', '👑', '🎯', '💎', '🐯'] as const

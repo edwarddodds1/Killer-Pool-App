@@ -124,22 +124,21 @@ export function TimerResultsPage() {
   return (
     <main className="page timerResultsPage">
       <div className="timerResultsTitleRow">
-        <h1 className="timerResultsTitle">Leaderboard</h1>
-        {isAdmin ? (
-          <span className="adminModeIcon" aria-label="Admin mode active" title="Admin mode active">
-            👥
-          </span>
-        ) : null}
+        <div className="timerResultsTitleLeft">
+          <h1 className="timerResultsTitle">Leaderboard</h1>
+          {isAdmin ? (
+            <span className="adminModeIcon" aria-label="Admin mode active" title="Admin mode active">
+              👥
+            </span>
+          ) : null}
+        </div>
+        <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
+          <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
+          </svg>
+        </button>
       </div>
       <section className="card timerResultsCard">
-        <div className="timerResultsHeader">
-          <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
-
         <div className="timerResultsGrid">
           <div className="timerResultsPanel">
             <h3>Your performance</h3>

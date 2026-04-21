@@ -5,7 +5,7 @@ import { AVATAR_ICONS } from '../constants/avatarIcons'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { BallIcon } from '../components/BallIcon'
 import type { PlayerState, RoomState } from '../types'
-import { activePlayer, allocateBalls, createNextGame, pickPlayerByBall, shuffle } from '../utils/game'
+import { activePlayer, allocateBalls, pickPlayerByBall, shuffle } from '../utils/game'
 import {
   getProfile,
   getRoom,
@@ -122,6 +122,7 @@ export function RoomPage() {
   const orderAnimKeyRef = useRef('')
   const inviteCopiedTimeoutRef = useRef<number | null>(null)
   const roomSnapshotRef = useRef<string>(JSON.stringify(room))
+  const roomRef = useRef<RoomState | null>(room)
 
   useEffect(() => {
     if (!profile) {
@@ -135,6 +136,7 @@ export function RoomPage() {
       const nextSnapshot = JSON.stringify(latest)
       if (nextSnapshot === roomSnapshotRef.current) return
       roomSnapshotRef.current = nextSnapshot
+      roomRef.current = latest
       setRoom(latest)
       upsertRoom(latest)
     }
@@ -144,6 +146,7 @@ export function RoomPage() {
       const nextSnapshot = JSON.stringify(latest)
       if (nextSnapshot === roomSnapshotRef.current) return
       roomSnapshotRef.current = nextSnapshot
+      roomRef.current = latest
       setRoom(latest)
       upsertRoom(latest)
     })
@@ -154,6 +157,7 @@ export function RoomPage() {
       const nextSnapshot = JSON.stringify(latest)
       if (nextSnapshot === roomSnapshotRef.current) return
       roomSnapshotRef.current = nextSnapshot
+      roomRef.current = latest
       setRoom(latest)
     }, TICK_MS)
 
@@ -167,6 +171,7 @@ export function RoomPage() {
           const nextSnapshot = JSON.stringify(latest)
           if (nextSnapshot === roomSnapshotRef.current) return
           roomSnapshotRef.current = nextSnapshot
+          roomRef.current = latest
           setRoom(latest)
           upsertRoom(latest)
         })
@@ -214,15 +219,24 @@ export function RoomPage() {
       .map((player) => player.avatarIcon)
       .filter((icon): icon is string => Boolean(icon)),
   )
-  const selectedAvatarIndex = me?.avatarIcon
-    ? AVATAR_ICONS.findIndex((icon) => icon === me.avatarIcon)
-    : -1
 
   const saveRoom = (next: RoomState, oldCode?: string) => {
     roomSnapshotRef.current = JSON.stringify(next)
+    roomRef.current = next
     setRoom(next)
     upsertRoom(next, oldCode)
     void upsertRoomRemote(next, oldCode)
+  }
+
+  const applyRoomUpdate = (
+    updater: (current: RoomState) => RoomState | null,
+    oldCode?: string,
+  ) => {
+    const current = roomRef.current ?? getRoom(code) ?? room
+    if (!current) return
+    const next = updater(current)
+    if (!next) return
+    saveRoom(next, oldCode)
   }
 
   useEffect(() => {
@@ -370,26 +384,35 @@ export function RoomPage() {
   }
 
   const toggleReady = () => {
-    saveRoom({
-      ...room,
-      players: room.players.map((player) =>
+    applyRoomUpdate((current) => ({
+      ...current,
+      players: current.players.map((player) =>
         player.id === me.id ? { ...player, ready: !player.ready } : player,
       ),
     })
+    )
   }
 
   const startAllocation = () => {
-    if (!allReady) return
-    const allocation = allocateBalls(room.players, room.mode, room.killerAllocationMode)
-    const nextPlayers = room.players.map((player) => ({
+    const latest = roomRef.current ?? room
+    if (!latest) return
+    const latestMe = latest.players.find((player) => player.id === me.id)
+    const latestAllReady = latest.players.length > 1 && latest.players.every((player) => player.ready)
+    if (!latestMe || !latestAllReady) return
+    const allocation = allocateBalls(latest.players, latest.mode, latest.killerAllocationMode)
+    const nextPlayers = latest.players.map((player) => ({
       ...player,
       assignedBalls: allocation.get(player.id) ?? [],
     }))
     const tempSpinner = setInterval(() => setAllocationPreview(Math.floor(Math.random() * 15) + 1), 90)
     setTimeout(() => {
       clearInterval(tempSpinner)
-      setAllocationPreview((allocation.get(me.id) ?? [1])[0])
-      saveRoom({ ...room, status: 'allocation', players: nextPlayers })
+      setAllocationPreview((allocation.get(latestMe.id) ?? [1])[0])
+      applyRoomUpdate((current) => {
+        const stillAllReady = current.players.length > 1 && current.players.every((player) => player.ready)
+        if (!stillAllReady || current.status !== 'lobby') return null
+        return { ...current, status: 'allocation', players: nextPlayers }
+      })
     }, PREP_SPIN_MS)
   }
 
@@ -496,15 +519,39 @@ export function RoomPage() {
   }
 
   const replay = () => {
-    const oldCode = room.code
-    let next = createNextGame(room)
-    while (getRoom(next.code)) next = createNextGame(room)
-    saveRoom(next, oldCode)
-    navigate(`/room/${next.code}`)
+    const nextPlayers = room.players.map((player) => ({
+      ...player,
+      ready: player.isBot ? true : false,
+      assignedBalls: [],
+      pottedBalls: [],
+      turns: 0,
+      kills: 0,
+      eliminated: false,
+    }))
+    const next: RoomState = {
+      ...room,
+      gameNumber: room.gameNumber + 1,
+      status: 'lobby',
+      players: nextPlayers,
+      playOrder: [],
+      turnIndex: 0,
+      sunkBalls: [],
+      eliminationOrder: [],
+    }
+    setAllocationPreview(null)
+    setOrderSpinName(null)
+    setOrderPhase('lineup')
+    setOrderCards([])
+    setDealingSlotIndex(null)
+    setOrderAnimationDone(false)
+    setLocalOrderStarted(false)
+    saveRoom(next)
+    navigate(`/room/${room.code}`)
   }
 
   const selectAvatarIcon = (icon: string) => {
-    if (takenIcons.has(icon)) return
+    if (takenIcons.has(icon) && me.avatarIcon !== icon) return
+    if (me.avatarIcon === icon) return
     saveProfile({ ...profile, avatarIcon: icon })
     saveRoom({
       ...room,
@@ -622,20 +669,13 @@ export function RoomPage() {
       {room.status === 'lobby' ? (
         <section className="card prepStageCard">
           <div className="stack">
-            <div
-              className="avatarPicker"
-              style={
-                {
-                  '--avatar-count': AVATAR_ICONS.length,
-                  '--avatar-index': selectedAvatarIndex < 0 ? 0 : selectedAvatarIndex,
-                } as CSSProperties
-              }
-            >
-              {selectedAvatarIndex >= 0 ? <span className="avatarPicker__thumb" aria-hidden="true" /> : null}
+            <div className="avatarPicker" role="radiogroup" aria-label="Choose avatar">
               {AVATAR_ICONS.map((icon) => (
                 <button
                   key={icon}
                   type="button"
+                  role="radio"
+                  aria-checked={me.avatarIcon === icon}
                   className={`avatarPick ${
                     takenIcons.has(icon) && me.avatarIcon !== icon ? 'avatarPick--taken' : ''
                   } ${me.avatarIcon === icon ? 'avatarPick--selected' : ''}`}
