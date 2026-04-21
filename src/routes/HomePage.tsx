@@ -161,7 +161,7 @@ export function HomePage() {
           ) : null}
         </div>
       </header>
-      <section className="card homeCard">
+      <section className="card card--pool homeCard">
         {!profile ? (
           <>
             <div className="homeCard__header">

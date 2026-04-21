@@ -85,18 +85,20 @@ export function TimerPoolPage() {
 
   return (
     <main className="page timerPage">
-      <section className="card timerCard timerCard--main">
+      <div className="timerPageTitleRow">
         <h1 className="timerTitle">Timer</h1>
-        <div className="timerHeader">
-          <button className="timerHomeBtn" onClick={() => navigate('/')} aria-label="Home">
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-        </div>
+        <button
+          type="button"
+          className="timerHomeBtn timerHomeBtn--small"
+          onClick={() => navigate('/')}
+          aria-label="Home"
+        >
+          <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
+          </svg>
+        </button>
+      </div>
+      <section className="card card--pool timerCard timerCard--main">
         <div className="timerDisplayWrap">
           <div className="timerDisplay" aria-live="polite">
             <span className="timerDisplay__group">{elapsedParts.minutes}</span>

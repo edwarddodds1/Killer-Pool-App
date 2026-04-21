@@ -379,7 +379,7 @@ export function RoomPage() {
   if (!room || !profile || !me) {
     return (
       <main className="page">
-        <section className="card">
+        <section className="card card--pool">
           <h2>Room not found</h2>
           <button className="btn btn--primary" onClick={() => navigate('/')}>
             Back to home
@@ -669,7 +669,7 @@ export function RoomPage() {
           <AvatarBadge username={me.username} avatarIcon={me.avatarIcon} />
           <div>
             <strong>{me.username}</strong>
-            {room.status !== 'inGame' ? <p>Code: {room.code}</p> : null}
+            {room.status === 'lobby' ? <p>Code: {room.code}</p> : null}
           </div>
         </div>
         {me.assignedBalls.length > 0 ? (
@@ -697,7 +697,7 @@ export function RoomPage() {
       ) : null}
 
       {room.status === 'lobby' ? (
-        <section className="card prepStageCard">
+        <section className="card card--pool prepStageCard">
           <div className="stack">
             <div className="avatarPicker" role="radiogroup" aria-label="Choose avatar">
               {AVATAR_ICONS.map((icon) => (
@@ -756,9 +756,8 @@ export function RoomPage() {
       ) : null}
 
       {room.status === 'allocation' && !shouldShowOrderStage ? (
-        <section className="card center prepStageCard">
-          <h2>Ball Allocation</h2>
-          <p className="muted">Your random ball</p>
+        <section className="card card--pool center prepStageCard">
+          <h2>Random Ball Allocation</h2>
           <div className={`ballReveal ${me.assignedBalls.length > 1 ? 'ballReveal--multi' : ''}`}>
             {(me.assignedBalls.length > 0 ? me.assignedBalls : [allocationPreview ?? 1]).map((ball) => (
               <BallIcon key={ball} ball={ball} large={me.assignedBalls.length <= 1} />
@@ -771,7 +770,7 @@ export function RoomPage() {
       ) : null}
 
       {shouldShowOrderStage ? (
-        <section className="card prepStageCard">
+        <section className="card card--pool prepStageCard">
           <h2>Break & Order</h2>
           <p className="muted">
             Breaker:{' '}
@@ -837,7 +836,7 @@ export function RoomPage() {
       ) : null}
 
       {room.status === 'inGame' ? (
-        <section className="card">
+        <section className="card card--pool">
           <h2>In Game</h2>
           <p className="turnText">
             Turn: <strong>{currentTurnPlayer?.username ?? '-'}</strong>
@@ -897,7 +896,7 @@ export function RoomPage() {
       ) : null}
 
       {room.status === 'results' ? (
-        <section className="card">
+        <section className="card card--pool">
           <h2>Winner</h2>
           <div className="stack">
             <div className="playerRow resultsHeaderRow" aria-hidden="true">

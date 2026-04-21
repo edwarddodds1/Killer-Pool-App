@@ -40,7 +40,7 @@ export function JoinPage() {
 
   return (
     <main className="page">
-      <section className="card">
+      <section className="card card--pool">
         <h2>Join Party</h2>
         {!profile ? <p className="muted">Sign in from Home to join with your account.</p> : null}
         <form onSubmit={onJoin} className="stack">

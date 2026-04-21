@@ -49,11 +49,33 @@ function TimerDeleteIconButton({
           …
         </span>
       ) : (
-        <svg className="timerDeleteIcon" viewBox="0 0 24 24" aria-hidden>
+        <svg
+          className="timerDeleteIcon"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden
+        >
           <path
-            fill="currentColor"
-            d="M9 3h6a1 1 0 011 1v1h4v2H4V5h4V4a1 1 0 011-1zm1 5h2v9h-2V8zm4 0h2v9h-2V8zM7 8h2v9H7V8zm-3 2h16l-1 10a2 2 0 01-2 2H7a2 2 0 01-2-2L4 10z"
+            d="M4 7h16"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
           />
+          <path
+            d="M9 7V5.5A1.5 1.5 0 0110.5 4h3A1.5 1.5 0 0115 5.5V7"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8 7v11a2 2 0 002 2h4a2 2 0 002-2V7"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinejoin="round"
+          />
+          <path d="M10 11v6M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
         </svg>
       )}
     </button>
@@ -171,7 +193,7 @@ export function TimerResultsPage() {
           </svg>
         </button>
       </div>
-      <section className="card timerResultsCard">
+      <section className="card card--pool timerResultsCard">
         <div className="timerResultsGrid">
           <div className="timerResultsPanel">
             <h3>Your performance</h3>

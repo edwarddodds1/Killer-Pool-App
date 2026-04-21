@@ -8,6 +8,24 @@
   --red: #d63c3c;
   --radius: 16px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  /* Pool table rail (only on .card--pool) — wood rail, cushion band, diamond sights */
+  --pool-rail-outer: #1f140a;
+  --pool-rail-face: #5c3d24;
+  --pool-rail-mid: #7a4f28;
+  --pool-rail-light: #9a6a38;
+  --pool-rail-shadow: rgba(18, 10, 4, 0.5);
+  /* Felt: Simonis-style blue (~#006edd) nudged lighter for screens + subtle lighting wash */
+  --pool-felt-base: #2d96f8;
+  --pool-cushion: rgba(0, 72, 168, 0.28);
+  --pool-sight: #ffffff;
+  --pool-sight-edge: rgba(0, 0, 0, 0.22);
+  --pool-felt-wash: radial-gradient(
+    120% 100% at 50% 40%,
+    #6bb4ff 0%,
+    #4aa3ff 30%,
+    var(--pool-felt-base) 62%,
+    #1f7fe0 100%
+  );
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   color: var(--text);
 }
@@ -94,8 +112,8 @@ h2 { font-size: 1.2rem; }
   gap: 6px 8px;
   max-width: 100%;
   padding: 4px 10px;
-  border-radius: 10px;
-  border: 1px solid #111;
+  border-radius: 12px;
+  border: 3px solid #000;
   background: #f7f7f7;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
   width: fit-content;
@@ -115,6 +133,27 @@ h2 { font-size: 1.2rem; }
   line-height: 1.1;
 }
 
+/* Home: thick black border on setup / mode controls only (not auth or footer account links) */
+.homePage .homeSetupForm .btn {
+  border-width: 3px;
+  border-style: solid;
+  border-color: #000;
+}
+.homePage .homeSetupForm .btn.btn--go {
+  border-color: #000;
+}
+.homePage .homeSetupForm .btn.btn--soft {
+  border-color: #000;
+}
+.homePage .modeSlider {
+  border-width: 3px;
+  border-style: solid;
+  border-color: #000;
+}
+.homePage .modeSlider--disabled {
+  border-color: #000;
+}
+
 .card {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -123,6 +162,95 @@ h2 { font-size: 1.2rem; }
   display: grid;
   gap: 12px;
   box-shadow: var(--shadow);
+}
+
+/* Large panels only: thick wood rail, cushion line, diamond sights (add `card--pool`) */
+.card.card--pool {
+  position: relative;
+  isolation: isolate;
+  border: none;
+  border-radius: 20px;
+  padding: 28px 24px;
+  background-color: var(--pool-felt-base);
+  background-image: var(--pool-felt-wash);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    inset 0 0 0 10px var(--pool-rail-light),
+    inset 0 0 0 13px var(--pool-rail-mid),
+    inset 0 0 0 16px var(--pool-rail-face),
+    inset 0 0 0 19px var(--pool-rail-outer),
+    inset 0 0 0 21px var(--pool-cushion),
+    inset 0 0 0 22px rgba(0, 0, 0, 0.06),
+    inset 0 0 28px var(--pool-rail-shadow),
+    var(--shadow);
+}
+
+/* Diamond sights only (pale dots in the rail band, nudged toward the outer rim). */
+.card.card--pool::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 1;
+  background-image:
+    /* —— long rails —— */
+    radial-gradient(circle 2.5px at 11% 7px, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 22% 7px, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 31% 7px, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 69% 7px, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 78% 7px, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 89% 7px, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 11% calc(100% - 7px), var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 22% calc(100% - 7px), var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 31% calc(100% - 7px), var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 69% calc(100% - 7px), var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 78% calc(100% - 7px), var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 89% calc(100% - 7px), var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    /* —— short rails —— */
+    radial-gradient(circle 2.5px at 7px 26%, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 7px 50%, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at 7px 74%, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at calc(100% - 7px) 26%, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at calc(100% - 7px) 50%, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%),
+    radial-gradient(circle 2.5px at calc(100% - 7px) 74%, var(--pool-sight) 0 42%, var(--pool-sight-edge) 44%, transparent 46%);
+  background-repeat: no-repeat;
+}
+
+.card.card--pool::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.14;
+  mix-blend-mode: multiply;
+  background: repeating-linear-gradient(
+    105deg,
+    transparent 0 6px,
+    rgba(0, 55, 130, 0.07) 6px 7px,
+    transparent 7px 16px
+  );
+}
+
+.card.card--pool > * {
+  position: relative;
+  z-index: 1;
+}
+
+.card.card--pool.homeCard {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    inset 0 0 0 10px var(--pool-rail-light),
+    inset 0 0 0 13px var(--pool-rail-mid),
+    inset 0 0 0 16px var(--pool-rail-face),
+    inset 0 0 0 19px var(--pool-rail-outer),
+    inset 0 0 0 21px var(--pool-cushion),
+    inset 0 0 0 22px rgba(0, 0, 0, 0.06),
+    inset 0 0 28px var(--pool-rail-shadow),
+    0 12px 36px rgba(0, 0, 0, 0.14);
 }
 .prepStageCard {
   animation: prepStageIn 220ms ease;
@@ -141,8 +269,6 @@ h2 { font-size: 1.2rem; }
 .homeCard {
   position: relative;
   z-index: 1;
-  border-color: #c8c8c8;
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.1);
 }
 .homeCard__header {
   display: flex;
@@ -159,6 +285,11 @@ h2 { font-size: 1.2rem; }
 }
 
 .header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.card.header {
+  border-width: 3px;
+  border-style: solid;
+  border-color: #000;
+}
 .header__left { display: flex; align-items: center; gap: 8px; }
 .stack { display: grid; gap: 8px; }
 .homeSetupForm { gap: 6px; }
@@ -403,6 +534,9 @@ input, select, .btn {
   align-items: center;
   gap: 8px;
 }
+.prepStageCard .playerList .playerRow {
+  background: #fff;
+}
 .resultsStats {
   display: grid;
   grid-template-columns: repeat(2, minmax(64px, auto));
@@ -441,9 +575,23 @@ input, select, .btn {
 }
 .ballReveal--multi .ball {
   width: clamp(64px, 12vw, 88px);
+  border-width: 5px;
+  border-color: #000;
+}
+.ballReveal--multi .ball .ball__face {
+  border-width: 3px;
+  border-color: #000;
 }
 
 .ballGrid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.ballGrid .ball {
+  border-width: 5px;
+  border-color: #000;
+}
+.ballGrid .ball .ball__face {
+  border-width: 3px;
+  border-color: #000;
+}
 .ball {
   --ball-color: #333;
   width: 100%;
@@ -497,10 +645,15 @@ input, select, .btn {
 }
 .ball--large {
   width: min(260px, 72vw);
-  border-width: 4px;
+  border-width: 7px;
+  border-color: #000;
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
 }
-.ball--large .ball__face { width: 56%; border-width: 3px; }
+.ball--large .ball__face {
+  width: 56%;
+  border-width: 5px;
+  border-color: #000;
+}
 .ball--large .ball__face span { font-size: 4.6rem; font-weight: 800; letter-spacing: -0.04em; }
 
 .myBallDock { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -689,11 +842,26 @@ input, select, .btn {
 .previewControls input[type='range'] { width: 100%; }
 
 .timerPage { gap: 10px; }
+.timerPageTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 3px solid #000;
+  background: #f7f7f7;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+.timerPageTitleRow .timerTitle {
+  text-align: left;
+  margin: 0 0 2px;
+}
 .timerCard { gap: 10px; }
 .timerCard--main {
-  min-height: calc(100vh - 140px);
+  min-height: calc(100vh - 200px);
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: 1fr auto auto;
   align-items: center;
   position: relative;
 }
@@ -704,11 +872,6 @@ input, select, .btn {
   font-weight: 900;
   letter-spacing: 0.03em;
   line-height: 1;
-}
-.timerHeader {
-  position: absolute;
-  top: 12px;
-  right: 12px;
 }
 .timerHomeBtn {
   border: 0;
@@ -821,6 +984,7 @@ input, select, .btn {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  margin-bottom: 10px;
 }
 .timerResultsTitleLeft {
   display: inline-flex;
@@ -1018,7 +1182,8 @@ input, select, .btn {
   .homeTimerRankBubble__value {
     font-size: 0.68rem;
   }
-  .card { padding: 12px; gap: 10px; }
+  .card { padding: 16px 12px; gap: 10px; }
+  .card.card--pool { padding: 22px 16px; }
   .split { grid-template-columns: 1fr; }
   .homeActionsRow { grid-template-columns: 1fr; }
   .header { align-items: flex-start; flex-wrap: wrap; }
@@ -1063,7 +1228,7 @@ input, select, .btn {
     font-size: clamp(2.45rem, 14.5vw, 3.4rem);
     padding: 8px 6px;
   }
-  .timerCard--main { min-height: calc(100vh - 160px); }
+  .timerCard--main { min-height: calc(100vh - 220px); }
   .timerHomeBtn { font-size: 0.74rem; }
   .timerHomeIcon { width: 16px; height: 16px; }
   .timerTitle {
