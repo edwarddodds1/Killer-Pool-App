@@ -142,6 +142,42 @@ export function TimerResultsPage() {
     return allRankedRuns.slice(0, 10)
   }, [allRankedRuns])
 
+  const averageLeaderboard = useMemo(() => {
+    const grouped = new Map<
+      string,
+      {
+        profileId: string
+        username: string
+        totalMs: number
+        runs: number
+      }
+    >()
+
+    for (const score of scores) {
+      const key = score.profileId || score.username.trim().toLowerCase()
+      const existing = grouped.get(key)
+      if (existing) {
+        existing.totalMs += score.elapsedMs
+        existing.runs += 1
+      } else {
+        grouped.set(key, {
+          profileId: score.profileId,
+          username: score.username,
+          totalMs: score.elapsedMs,
+          runs: 1,
+        })
+      }
+    }
+
+    return [...grouped.values()]
+      .map((entry) => ({
+        ...entry,
+        averageMs: Math.round(entry.totalMs / entry.runs),
+      }))
+      .sort((a, b) => a.averageMs - b.averageMs)
+      .slice(0, 10)
+  }, [scores])
+
   const hasPendingSync = useMemo(() => scores.some((s) => s.pendingSync), [scores])
 
   const bestRuns = userRuns
@@ -179,6 +215,12 @@ export function TimerResultsPage() {
     }
   }
 
+  const openPlayerProfile = (score: Pick<TimerScore, 'profileId' | 'username'>) => {
+    const username = score.username.trim()
+    const suffix = username ? `?username=${encodeURIComponent(username)}` : ''
+    navigate(`/profile/${encodeURIComponent(score.profileId)}${suffix}`)
+  }
+
   return (
     <main className="page timerResultsPage">
       <div className="timerResultsTitleRow">
@@ -190,11 +232,21 @@ export function TimerResultsPage() {
             </span>
           ) : null}
         </div>
-        <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
-          <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
-          </svg>
-        </button>
+        <div className="timerTitleActions">
+          <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/profile')} aria-label="Profile">
+            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Zm0 2.3c-3.9 0-7.2 2.1-8.3 5.2-.2.6.2 1.3.9 1.3h14.8c.7 0 1.1-.7.9-1.3-1.1-3.1-4.4-5.2-8.3-5.2Z"
+                fill="currentColor"
+              />
+            </svg>
+          </button>
+          <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
+            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
+            </svg>
+          </button>
+        </div>
       </div>
       <section className="card card--pool timerResultsCard">
         <div className="timerResultsGrid">
@@ -323,13 +375,31 @@ export function TimerResultsPage() {
                   const runKey = timerScoreKey(score)
                   const deleting = deletingRunKey === runKey
                   return (
-                    <div key={runKey} className="timerRow timerRow--leaderboardCompact">
+                    <div
+                      key={runKey}
+                      className="timerRow timerRow--leaderboardCompact timerRow--selectable"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openPlayerProfile(score)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') openPlayerProfile(score)
+                      }}
+                    >
                       <span>#{index + 1}</span>
                       <span className="timerRowUser">{score.username}</span>
                       <div className="timerRowActions">
                         <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
                         {isAdmin ? (
-                          <TimerDeleteIconButton busy={deleting} onClick={() => void onDeleteRun(score)} />
+                          <TimerDeleteIconButton
+                            busy={deleting}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void onDeleteRun(score)
+                            }}
+                            onKeyDown={(event) => {
+                              event.stopPropagation()
+                            }}
+                          />
                         ) : null}
                       </div>
                     </div>
@@ -339,6 +409,34 @@ export function TimerResultsPage() {
                 <p className="muted">Leaderboard is empty.</p>
               )}
             </div>
+          </div>
+        </div>
+        <div className="timerAverageRankings">
+          <h3>Average rankings</h3>
+          <div className="timerList">
+            {averageLeaderboard.length ? (
+              averageLeaderboard.map((entry, index) => (
+                <div
+                  key={`${entry.profileId}-${entry.username}`}
+                  className="timerRow timerRow--leaderboardCompact timerRow--selectable"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openPlayerProfile(entry)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') openPlayerProfile(entry)
+                  }}
+                >
+                  <span>#{index + 1}</span>
+                  <span className="timerRowUser">{entry.username}</span>
+                  <div className="timerRowActions">
+                    <small>{entry.runs} runs</small>
+                    <strong>{formatTimerElapsedMs(entry.averageMs)}</strong>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="muted">Average rankings will appear after recorded runs.</p>
+            )}
           </div>
         </div>
         <div className="timerResultsActions">

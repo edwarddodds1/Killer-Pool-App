@@ -1,4 +1,5 @@
 :root {
+  color-scheme: light;
   --bg: #ececec;
   --surface: #ffffff;
   --text: #141414;
@@ -617,10 +618,14 @@ input, select, .btn {
   padding: 0;
   position: relative;
   overflow: hidden;
+  /* Keep authored ball colors stable across forced/high-contrast modes. */
+  forced-color-adjust: none;
+  print-color-adjust: exact;
+  -webkit-print-color-adjust: exact;
 }
 .ball:disabled { cursor: default; }
 .ball__face {
-  width: 52%;
+  width: 46%;
   aspect-ratio: 1;
   background: #fff;
   border-radius: 999px;
@@ -628,12 +633,14 @@ input, select, .btn {
   place-items: center;
   border: 2px solid #111;
   z-index: 1;
+  forced-color-adjust: none;
 }
 .ball__face span {
-  font-size: clamp(1.2rem, 4.1vw, 1.65rem);
+  font-size: clamp(0.98rem, 3.4vw, 1.34rem);
   font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.06em;
+  letter-spacing: -0.02em;
+  forced-color-adjust: none;
 }
 .ball--striped { background: #fff; }
 .ball--striped::before { content: ''; position: absolute; inset: 20% 0; background: var(--ball-color); }
@@ -660,11 +667,11 @@ input, select, .btn {
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
 }
 .ball--large .ball__face {
-  width: 56%;
+  width: 50%;
   border-width: 5px;
   border-color: #000;
 }
-.ball--large .ball__face span { font-size: 4.6rem; font-weight: 800; letter-spacing: -0.04em; }
+.ball--large .ball__face span { font-size: 3.9rem; font-weight: 800; letter-spacing: -0.01em; }
 
 .myBallDock { display: flex; flex-wrap: wrap; gap: 6px; }
 .myBallDock .ball { width: 38px; }
@@ -673,8 +680,35 @@ input, select, .btn {
 .headerBallIndicator { display: flex; gap: 6px; align-items: center; }
 .headerBallIndicator .ball { width: 42px; }
 .headerBallIndicator .ball { height: 42px; }
-.headerBallIndicator .ball .ball__face { width: 58%; }
-.headerBallIndicator .ball .ball__face span { font-size: 0.72rem; letter-spacing: -0.08em; }
+.headerBallIndicator .ball .ball__face { width: 50%; }
+.headerBallIndicator .ball .ball__face span { font-size: 0.64rem; letter-spacing: -0.01em; }
+.headerBallIndicatorWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.headerBallToggle {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 3px solid #000;
+  background: radial-gradient(circle at 35% 30%, #4ca5ff 0%, #1d7fdf 55%, #145faa 100%);
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  color: #fff;
+  cursor: pointer;
+}
+.headerBallToggle__eye {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+}
+.headerBallToggle__eye svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
 
 .orderRow { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
 .orderCard {
@@ -858,6 +892,11 @@ input, select, .btn {
   justify-content: space-between;
   gap: 8px;
 }
+.timerTitleActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .timerPageTitleRow .timerTitle {
   text-align: left;
   margin: 0 0 2px;
@@ -934,6 +973,20 @@ input, select, .btn {
   gap: 10px;
 }
 .timerControls .btn { min-height: 66px; font-size: 1.1rem; width: 100%; }
+.timerCountdownOption {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2f2f2f;
+}
+.timerCountdownOption input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
 .timerRules {
   width: 100%;
   border: 1px solid var(--border);
@@ -1131,6 +1184,196 @@ input, select, .btn {
   grid-template-columns: 1fr;
   gap: 10px;
 }
+.timerAverageRankings {
+  display: grid;
+  gap: 8px;
+}
+.timerAverageRankings h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+/* Profile page */
+.profilePage {
+  gap: 10px;
+}
+.profileTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.profileTitle {
+  font-size: clamp(2.05rem, 8.2vw, 3.05rem);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  margin: 0;
+}
+.profileCard {
+  gap: 16px;
+}
+.profileCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.profileCardHeader h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+.profileStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.profileStatCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+.profileStatCard span {
+  font-size: 0.79rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+.profileStatCard strong {
+  font-size: 1.02rem;
+}
+.profileChartSection,
+.profileTableSection {
+  display: grid;
+  gap: 8px;
+}
+.profileChartSection h3,
+.profileTableSection h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+.profileChartSurface {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 8px;
+}
+.profileChartSurface--progress {
+  display: grid;
+  grid-template-columns: 74px 1fr;
+  gap: 10px;
+  align-items: stretch;
+  padding: 10px;
+}
+.profileChartAxis {
+  position: relative;
+  min-height: 190px;
+}
+.profileChartAxis span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  font-size: 0.69rem;
+  color: #535d6b;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.profileChartPlot {
+  min-height: 190px;
+}
+.profileLineChart {
+  width: 100%;
+  height: 190px;
+  display: block;
+}
+.profileLineGrid {
+  stroke: #d5dee9;
+  stroke-width: 1;
+}
+.profileBars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+.profileBarCol {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+}
+.profileBarTrack {
+  width: 100%;
+  max-width: 36px;
+  height: 110px;
+  border-radius: 8px;
+  background: #eef2f8;
+  border: 1px solid #d9e2ee;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+.profileBarFill {
+  width: 100%;
+  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
+}
+.profileBarLabel {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #2f3743;
+}
+.profileBarCol small {
+  font-size: 0.67rem;
+  color: #525b68;
+  text-align: center;
+}
+.profileTableWrap {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: auto;
+}
+.profileTable {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 590px;
+}
+.profileTable th,
+.profileTable td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid #eceff3;
+  font-size: 0.84rem;
+}
+.profileTable th {
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4a525f;
+}
+.profileTable tr:last-child td {
+  border-bottom: 0;
+}
+.profileStatusText {
+  color: #5b6470;
+  font-weight: 600;
+}
+.profileSyncDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #22c55e;
+  border: 1px solid #000;
+  vertical-align: middle;
+}
 .timerHomeBtn--small {
   border: 0;
   background: transparent;
@@ -1186,6 +1429,32 @@ input, select, .btn {
   }
   .homeTimerRankBubble__value {
     font-size: 0.68rem;
+  }
+  .profileStatsGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .profileCardHeader {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .profileBars {
+    padding: 8px;
+    gap: 6px;
+  }
+  .profileChartSurface--progress {
+    grid-template-columns: 58px 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+  .profileChartAxis span {
+    font-size: 0.62rem;
+  }
+  .profileBarTrack {
+    height: 96px;
+    max-width: 30px;
+  }
+  .profileTable {
+    min-width: 520px;
   }
   .card { padding: 16px 12px; gap: 10px; }
   .card.header {

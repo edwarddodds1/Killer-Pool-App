@@ -117,6 +117,7 @@ export function RoomPage() {
   const [localOrderStarted, setLocalOrderStarted] = useState(false)
   const [localOrderRunId, setLocalOrderRunId] = useState(0)
   const [inviteCopied, setInviteCopied] = useState(false)
+  const [showHeaderBalls, setShowHeaderBalls] = useState(false)
   const orderTimeoutsRef = useRef<number[]>([])
   const orderIntervalRef = useRef<number | null>(null)
   const orderAnimKeyRef = useRef('')
@@ -225,6 +226,17 @@ export function RoomPage() {
     (me?.assignedBalls.length ?? 0) === 0 &&
     (me?.pottedBalls.length ?? 0) === 0 &&
     (me?.turns ?? 0) === 0
+
+  useEffect(() => {
+    if (!room || !me) return
+    if (room.mode !== 'killer') {
+      setShowHeaderBalls(true)
+      return
+    }
+    if (me.assignedBalls.length === 0) {
+      setShowHeaderBalls(false)
+    }
+  }, [me, room])
 
   const saveRoom = (next: RoomState, oldCode?: string) => {
     roomSnapshotRef.current = JSON.stringify(next)
@@ -673,11 +685,44 @@ export function RoomPage() {
           </div>
         </div>
         {me.assignedBalls.length > 0 ? (
-          <div className="headerBallIndicator">
-            {me.assignedBalls.map((ball) => (
-              <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
-            ))}
-          </div>
+          room.mode === 'killer' ? (
+            <div className="headerBallIndicatorWrap">
+              <button
+                type="button"
+                className="headerBallToggle"
+                onClick={() => setShowHeaderBalls((current) => !current)}
+                aria-pressed={showHeaderBalls}
+                aria-label={showHeaderBalls ? 'Hide assigned balls' : 'Show assigned balls'}
+                title={showHeaderBalls ? 'Hide assigned balls' : 'Show assigned balls'}
+              >
+                <span className="headerBallToggle__eye" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path
+                      d="M12 5.6c4.9 0 8.2 3.8 9.4 6.4.2.4.2.7 0 1.1-1.2 2.6-4.5 6.4-9.4 6.4S3.8 15.7 2.6 13.1a1.2 1.2 0 0 1 0-1.1C3.8 9.4 7.1 5.6 12 5.6Z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="12" cy="12.5" r="2.7" fill="currentColor" />
+                  </svg>
+                </span>
+              </button>
+              {showHeaderBalls ? (
+                <div className="headerBallIndicator">
+                  {me.assignedBalls.map((ball) => (
+                    <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="headerBallIndicator">
+              {me.assignedBalls.map((ball) => (
+                <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
+              ))}
+            </div>
+          )
         ) : room.status !== 'inGame' ? (
           <button
             className={`btn btn--small ${inviteCopied ? 'btn--copied' : ''}`}
