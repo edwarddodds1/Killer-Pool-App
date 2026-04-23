@@ -122,6 +122,7 @@ export function RoomPage() {
   const orderIntervalRef = useRef<number | null>(null)
   const orderAnimKeyRef = useRef('')
   const inviteCopiedTimeoutRef = useRef<number | null>(null)
+  const inGameUndoRef = useRef<RoomState[]>([])
   const roomSnapshotRef = useRef<string>(JSON.stringify(room))
   const roomRef = useRef<RoomState | null>(room)
 
@@ -228,6 +229,13 @@ export function RoomPage() {
     (me?.turns ?? 0) === 0
 
   useEffect(() => {
+    if (!room) return
+    if (room.status !== 'inGame') {
+      inGameUndoRef.current = []
+    }
+  }, [room?.code, room?.gameNumber, room?.status])
+
+  useEffect(() => {
     if (!room || !me) return
     if (room.mode !== 'killer') {
       setShowHeaderBalls(true)
@@ -244,6 +252,14 @@ export function RoomPage() {
     setRoom(next)
     upsertRoom(next, oldCode)
     void upsertRoomRemote(next, oldCode)
+  }
+
+  const pushUndoSnapshot = (snapshot: RoomState) => {
+    const clone = JSON.parse(JSON.stringify(snapshot)) as RoomState
+    inGameUndoRef.current.push(clone)
+    if (inGameUndoRef.current.length > 30) {
+      inGameUndoRef.current.splice(0, inGameUndoRef.current.length - 30)
+    }
   }
 
   const applyRoomUpdate = (
@@ -477,6 +493,7 @@ export function RoomPage() {
   const potBall = (ball: number) => {
     if (isLateJoinLocked) return
     if (room.sunkBalls.includes(ball) || !currentTurnPlayer) return
+    pushUndoSnapshot(room)
     const nextPlayers = room.players.map((player) => ({ ...player }))
     const current = nextPlayers.find((player) => player.id === currentTurnPlayer.id)
     if (!current) return
@@ -535,6 +552,7 @@ export function RoomPage() {
 
   const endTurn = () => {
     if (isLateJoinLocked) return
+    pushUndoSnapshot(room)
     const nextTurnIndex = findNextTurn(room, room.turnIndex)
     const nextPlayers = room.players.map((player) => ({ ...player }))
     const nextTurnPlayerId = room.playOrder[nextTurnIndex]
@@ -543,6 +561,12 @@ export function RoomPage() {
       nextTurnPlayer.turns = (nextTurnPlayer.turns ?? 0) + 1
     }
     saveRoom({ ...room, players: nextPlayers, turnIndex: nextTurnIndex })
+  }
+
+  const undoLastAction = () => {
+    const previous = inGameUndoRef.current.pop()
+    if (!previous) return
+    saveRoom(previous)
   }
 
   const replay = () => {
@@ -882,10 +906,34 @@ export function RoomPage() {
 
       {room.status === 'inGame' ? (
         <section className="card card--pool">
-          <h2>In Game</h2>
-          <p className="turnText">
-            Turn: <strong>{currentTurnPlayer?.username ?? '-'}</strong>
-          </p>
+          <div className="inGameTopRow">
+            <p className="turnText">
+              Turn: <strong>{currentTurnPlayer?.username ?? '-'}</strong>
+            </p>
+            <div className="inGameTopActions">
+              <button
+                className="btn btn--danger btn--small"
+                onClick={endTurn}
+                disabled={isLateJoinLocked}
+              >
+                End turn
+              </button>
+              <button
+                className="inGameUndoBtn"
+                onClick={undoLastAction}
+                disabled={isLateJoinLocked || inGameUndoRef.current.length === 0}
+                aria-label="Undo last action"
+                title="Undo"
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M7.6 7.6V4L2 9.6l5.6 5.6v-3.7h6.1a4.3 4.3 0 1 1 0 8.6h-1.8v2.1h1.8a6.4 6.4 0 1 0 0-12.8H7.6Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
           <div className="ballGrid">
             {Array.from({ length: 15 }, (_, idx) => idx + 1).map((ball) => (
               <BallIcon
@@ -934,9 +982,6 @@ export function RoomPage() {
               )
             })}
           </div>
-          <button className="btn btn--danger" onClick={endTurn} disabled={isLateJoinLocked}>
-            End {currentTurnPlayer?.username ?? 'player'}'s turn
-          </button>
         </section>
       ) : null}
 

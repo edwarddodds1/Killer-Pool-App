@@ -14,6 +14,17 @@ function buildLinePath(points: Array<{ x: number; y: number }>) {
   return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
 }
 
+function formatMinutesSeconds(ms: number) {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value))
+}
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const { profileId } = useParams<{ profileId?: string }>()
@@ -76,7 +87,11 @@ export function ProfilePage() {
   }, [profileRuns])
 
   const latestRun = profileRuns[0] ?? null
-  const pendingRuns = profileRuns.filter((run) => run.pendingSync).length
+  const fiveGameAverageMs = useMemo(() => {
+    if (!profileRuns.length) return null
+    const recentRuns = profileRuns.slice(0, 5)
+    return Math.round(recentRuns.reduce((total, run) => total + run.elapsedMs, 0) / recentRuns.length)
+  }, [profileRuns])
 
   const progressRuns = useMemo(() => profileRuns.slice().reverse(), [profileRuns])
 
@@ -169,6 +184,22 @@ export function ProfilePage() {
     return fasterPlayers + 1
   }, [bestRun, scores])
 
+  const formStars = useMemo(() => {
+    if (!bestRun || averageMs === null || fiveGameAverageMs === null) return 0
+    const pbMs = bestRun.elapsedMs
+    const recentImprovement = averageMs > 0 ? (averageMs - fiveGameAverageMs) / averageMs : 0
+    const recentComponent = clamp01(0.5 + recentImprovement * 2)
+    const pbClosenessComponent = clamp01(1 - (fiveGameAverageMs - pbMs) / (pbMs * 0.35))
+    const consistencyComponent = clamp01(1 - (averageMs - pbMs) / (pbMs * 0.6))
+    const rankingComponent = personalRank ? clamp01(1 - (personalRank - 1) / 24) : 0.5
+    const weightedScore =
+      recentComponent * 0.35 +
+      pbClosenessComponent * 0.25 +
+      consistencyComponent * 0.15 +
+      rankingComponent * 0.25
+    return Math.max(1, Math.min(5, Math.round(weightedScore * 5)))
+  }, [averageMs, bestRun, fiveGameAverageMs, personalRank])
+
   const onDeleteAccount = async () => {
     const confirmed = window.confirm('Delete your account? This removes your account credentials from this app.')
     if (!confirmed) return
@@ -185,24 +216,47 @@ export function ProfilePage() {
     <main className="page profilePage">
       <div className="profileTitleRow">
         <h1 className="profileTitle">{viewingOwnProfile ? 'Your Profile' : 'Player Profile'}</h1>
-        <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
-          <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
-          </svg>
-        </button>
-      </div>
-
-      <section className="card card--pool profileCard">
-        <header className="profileCardHeader">
-          <h2>{profileDisplayName}</h2>
-          <button className="profileBackBtn" type="button" onClick={() => navigate(-1)} aria-label="Back">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+        <div className="profileTitleActions">
+          <button
+            className="timerHomeBtn timerHomeBtn--small profileBackBtn"
+            type="button"
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+          >
+            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M14.7 5.3a1 1 0 0 1 0 1.4L10.4 11H20a1 1 0 1 1 0 2h-9.6l4.3 4.3a1 1 0 0 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0Z"
                 fill="currentColor"
               />
             </svg>
           </button>
+          <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
+            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <section className="card card--pool profileCard">
+        <header className="profileCardHeader">
+          <h2>{profileDisplayName}</h2>
+          <div className="profileFormRating" aria-label={`Form rating ${formStars} out of 5`}>
+            <span className="profileFormLabel">Form</span>
+            {Array.from({ length: 5 }, (_, index) => (
+              <svg
+                key={index}
+                viewBox="0 0 24 24"
+                className={`profileFormStar ${index < formStars ? 'profileFormStar--filled' : ''}`}
+                aria-hidden="true"
+              >
+                <path
+                  d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
+                  fill="currentColor"
+                />
+              </svg>
+            ))}
+          </div>
         </header>
 
         {error ? <p className="error">{error}</p> : null}
@@ -229,8 +283,8 @@ export function ProfilePage() {
             <strong>{latestRun ? formatTimerElapsedMs(latestRun.elapsedMs) : '--:--.--'}</strong>
           </article>
           <article className="profileStatCard">
-            <span>Pending sync</span>
-            <strong>{pendingRuns}</strong>
+            <span>5 game average</span>
+            <strong>{fiveGameAverageMs !== null ? formatTimerElapsedMs(fiveGameAverageMs) : '--:--.--'}</strong>
           </article>
         </section>
 
@@ -253,8 +307,8 @@ export function ProfilePage() {
                   {lineChart.ticks.map((tick) => (
                     <line
                       key={`grid-${tick.value}-${tick.y}`}
-                      x1={0}
-                      x2={lineChart.width}
+                      x1={-4}
+                      x2={lineChart.width + 4}
                       y1={tick.y}
                       y2={tick.y}
                       className="profileLineGrid"
@@ -267,12 +321,14 @@ export function ProfilePage() {
                     y2={lineChart.averageY}
                     className="profileLineAverage"
                   />
-                  <path d={lineChart.path} fill="none" stroke="#0f172a" strokeWidth="2.75" strokeLinecap="round" />
-                  {lineChart.points.length <= 140
-                    ? lineChart.points.map((point) => (
-                        <circle key={point.run.createdAt} cx={point.x} cy={point.y} r="2.5" fill="#1d4ed8" />
-                      ))
-                    : null}
+                  <path
+                    d={lineChart.path}
+                    fill="none"
+                    stroke="#1d4ed8"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
                 <small className="profileLineAverageLabel">
                   Average: {formatTimerElapsedMs(lineChart.averageValue)}
@@ -285,7 +341,7 @@ export function ProfilePage() {
         </section>
 
         <section className="profileChartSection">
-          <h3>Average by Day of Week</h3>
+          <h3>Daily Average</h3>
           {weekdayAverages.some((entry) => entry.averageMs !== null) ? (
             <div className="profileBars">
               {weekdayAverages.map((entry) => {
@@ -296,7 +352,7 @@ export function ProfilePage() {
                       {entry.averageMs ? <div className="profileBarFill" style={{ height: `${heightPct}%` }} /> : null}
                     </div>
                     <span className="profileBarLabel">{entry.label}</span>
-                    <small>{entry.averageMs ? formatTimerElapsedMs(entry.averageMs) : '--:--.--'}</small>
+                    <small>{entry.averageMs ? formatMinutesSeconds(entry.averageMs) : '--:--'}</small>
                   </div>
                 )
               })}

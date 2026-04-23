@@ -441,7 +441,7 @@ input, select, .btn {
 .modeSlider__thumb {
   position: absolute;
   top: 4px;
-  left: calc(4px + var(--slider-index) * (50% - 2px));
+  left: calc(4px + var(--slider-index) * (50% - 3px));
   width: calc(50% - 2px);
   height: calc(100% - 8px);
   border-radius: 9px;
@@ -824,6 +824,41 @@ input, select, .btn {
 .playerMiniPots .ball .ball__face span { font-size: 0.48rem; letter-spacing: -0.04em; }
 
 .turnText { font-size: 1.1rem; }
+.inGameUndoBtn {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  background: transparent;
+  color: #4b5563;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+.inGameUndoBtn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+.inGameUndoBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.inGameTopRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+.inGameTopActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.inGameTopRow .turnText {
+  margin: 0;
+}
 
 .previewStage {
   border: 1px solid var(--border);
@@ -999,6 +1034,7 @@ input, select, .btn {
   width: 100%;
   display: grid;
   align-self: center;
+  position: relative;
 }
 .timerDisplay__group {
   display: inline-block;
@@ -1022,8 +1058,14 @@ input, select, .btn {
   gap: 10px;
 }
 .timerControls .btn { min-height: 66px; font-size: 1.1rem; width: 100%; }
-.timerCountdownOption {
+.timerOptionsRow {
   width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.timerCountdownOption {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1031,10 +1073,35 @@ input, select, .btn {
   font-weight: 600;
   color: #2f2f2f;
 }
+.timerPenaltyBtn {
+  min-height: 40px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
 .timerCountdownOption input[type='checkbox'] {
   width: 18px;
   height: 18px;
   margin: 0;
+}
+.timerPenaltyDots {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: 96px;
+  z-index: 2;
+}
+.timerPenaltyDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #ef4444;
+  border: 1px solid #111;
+  box-sizing: border-box;
 }
 .timerRules {
   width: 100%;
@@ -1252,6 +1319,11 @@ input, select, .btn {
   justify-content: space-between;
   gap: 8px;
 }
+.profileTitleActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 .profileTitle {
   font-size: clamp(2.05rem, 8.2vw, 3.05rem);
   font-weight: 900;
@@ -1272,21 +1344,33 @@ input, select, .btn {
   margin: 0;
   font-size: 1.2rem;
 }
+.profileFormRating {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.profileFormLabel {
+  margin-right: 4px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #3b4350;
+  letter-spacing: 0.01em;
+}
+.profileFormStar {
+  width: 14px;
+  height: 14px;
+  color: #c9d0da;
+}
+.profileFormStar--filled {
+  color: #f59e0b;
+}
 .profileBackBtn {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 2px solid #000;
-  background: #fff;
-  color: #111;
   display: inline-grid;
   place-items: center;
-  padding: 0;
-  cursor: pointer;
 }
 .profileBackBtn svg {
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   display: block;
 }
 .profileStatsGrid {
@@ -1389,8 +1473,8 @@ input, select, .btn {
   max-width: 36px;
   height: 110px;
   border-radius: 8px;
-  background: #eef2f8;
-  border: 1px solid #d9e2ee;
+  background: transparent;
+  border: 0;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1435,6 +1519,12 @@ input, select, .btn {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #4a525f;
+}
+.profileTable tbody tr:nth-child(odd) td {
+  background: #ffffff;
+}
+.profileTable tbody tr:nth-child(even) td {
+  background: #f3f5f8;
 }
 .profileTable tr:last-child td {
   border-bottom: 0;

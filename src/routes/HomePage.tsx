@@ -293,7 +293,6 @@ export function HomePage() {
       {profile ? (
         <footer className="homeSessionFooter">
           <span className="homeSessionFooter__identity">
-            Signed in as <strong>{profile.username}</strong>
             <button type="button" className="homeSessionFooter__profileLink" onClick={() => navigate('/profile')} aria-label="Profile">
               <svg viewBox="0 0 24 24" className="btn__iconSvg" aria-hidden="true">
                 <path
@@ -302,6 +301,7 @@ export function HomePage() {
                 />
               </svg>
             </button>
+            <strong>{profile.username}</strong>
           </span>
           <span className="homeSessionFooter__actions">
             <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
