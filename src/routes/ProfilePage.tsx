@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
 import { formatTimerElapsedMs, timerScoreBelongsToProfile, timerScoreKey } from '../../shared/timerLeaderboard'
-import { flushPendingTimerScores, getProfile, getTimerScores } from '../utils/store'
+import { deleteCurrentAccount, flushPendingTimerScores, getProfile, getTimerScores } from '../utils/store'
 
 function formatRunDate(iso: string) {
   const date = new Date(iso)
@@ -83,36 +83,37 @@ export function ProfilePage() {
   const lineChart = useMemo(() => {
     const width = 620
     const height = 190
+    const TICK_MS = 30_000
     if (!progressRuns.length) {
       return {
         width,
         height,
-        min: 0,
-        max: 0,
+        max: TICK_MS,
         path: '',
         points: [] as Array<{ x: number; y: number; run: TimerScore }>,
-        ticks: [] as Array<{ y: number; value: number; label: string }>,
+        ticks: [
+          { y: 0, value: TICK_MS, label: formatTimerElapsedMs(TICK_MS) },
+          { y: height, value: 0, label: formatTimerElapsedMs(0) },
+        ] as Array<{ y: number; value: number; label: string }>,
       }
     }
-    const min = Math.min(...progressRuns.map((run) => run.elapsedMs))
-    const max = Math.max(...progressRuns.map((run) => run.elapsedMs))
-    const span = Math.max(1, max - min)
+    const worstRun = Math.max(...progressRuns.map((run) => run.elapsedMs))
+    const axisMaxRaw = worstRun + 15_000
+    const axisMax = Math.max(TICK_MS, Math.ceil(axisMaxRaw / TICK_MS) * TICK_MS)
     const points = progressRuns.map((run, index) => {
       const x = progressRuns.length === 1 ? width / 2 : (index / (progressRuns.length - 1)) * width
-      const y = height - ((run.elapsedMs - min) / span) * height
+      const y = height - (run.elapsedMs / axisMax) * height
       return { x, y, run }
     })
-    const ticks = Array.from({ length: 5 }, (_, index) => {
-      const ratio = index / 4
-      const value = Math.round(max - ratio * span)
-      const y = ratio * height
+    const ticks = Array.from({ length: Math.floor(axisMax / TICK_MS) + 1 }, (_, index) => {
+      const value = axisMax - index * TICK_MS
+      const y = height - (value / axisMax) * height
       return { y, value, label: formatTimerElapsedMs(value) }
     })
     return {
       width,
       height,
-      min,
-      max,
+      max: axisMax,
       path: buildLinePath(points.map((p) => ({ x: p.x, y: p.y }))),
       points,
       ticks,
@@ -162,6 +163,18 @@ export function ProfilePage() {
     return fasterPlayers + 1
   }, [bestRun, scores])
 
+  const onDeleteAccount = async () => {
+    const confirmed = window.confirm('Delete your account? This removes your account credentials from this app.')
+    if (!confirmed) return
+    setError('')
+    try {
+      await deleteCurrentAccount()
+      navigate('/', { replace: true })
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Could not delete account.')
+    }
+  }
+
   return (
     <main className="page profilePage">
       <div className="profileTitleRow">
@@ -176,8 +189,13 @@ export function ProfilePage() {
       <section className="card card--pool profileCard">
         <header className="profileCardHeader">
           <h2>{profileDisplayName}</h2>
-          <button className="btn" type="button" onClick={() => navigate('/timer/results')}>
-            Timer Leaderboard
+          <button className="profileBackBtn" type="button" onClick={() => navigate(-1)} aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M14.7 5.3a1 1 0 0 1 0 1.4L10.4 11H20a1 1 0 1 1 0 2h-9.6l4.3 4.3a1 1 0 0 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0Z"
+                fill="currentColor"
+              />
+            </svg>
           </button>
         </header>
 
@@ -313,6 +331,13 @@ export function ProfilePage() {
             <p className="muted">{viewingOwnProfile ? 'No timer attempts recorded yet.' : 'No runs found for this player yet.'}</p>
           )}
         </section>
+        {viewingOwnProfile ? (
+          <div className="profileBottomActions">
+            <button className="btn btn--danger" type="button" onClick={() => void onDeleteAccount()}>
+              Delete account
+            </button>
+          </div>
+        ) : null}
       </section>
     </main>
   )

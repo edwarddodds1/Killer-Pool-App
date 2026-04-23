@@ -314,6 +314,27 @@ h2 { font-size: 1.2rem; }
   color: var(--muted);
   font-size: 0.8rem;
 }
+.homeSessionFooter__identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.homeSessionFooter__profileLink {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #111;
+  background: #fff;
+  color: #111;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+.homeSessionFooter__profileLink .btn__iconSvg {
+  width: 16px;
+  height: 16px;
+}
 .homeSessionFooter__signOut {
   border: 0;
   background: transparent;
@@ -573,6 +594,9 @@ input, select, .btn {
   padding-top: 0;
   padding-bottom: 0;
 }
+.resultsList .playerRow {
+  background: #fff;
+}
 .ready { color: var(--muted); font-weight: 700; }
 .ready--yes { color: var(--green); }
 .center { justify-items: center; text-align: center; }
@@ -590,7 +614,7 @@ input, select, .btn {
   border-color: #000;
 }
 .ballReveal--multi .ball .ball__face {
-  border-width: 3px;
+  border-width: 2px;
   border-color: #000;
 }
 
@@ -600,7 +624,7 @@ input, select, .btn {
   border-color: #000;
 }
 .ballGrid .ball .ball__face {
-  border-width: 3px;
+  border-width: 2px;
   border-color: #000;
 }
 .ball {
@@ -625,18 +649,18 @@ input, select, .btn {
 }
 .ball:disabled { cursor: default; }
 .ball__face {
-  width: 46%;
+  width: 50%;
   aspect-ratio: 1;
   background: #fff;
   border-radius: 999px;
   display: grid;
   place-items: center;
-  border: 2px solid #111;
+  border: 1.5px solid #111;
   z-index: 1;
   forced-color-adjust: none;
 }
 .ball__face span {
-  font-size: clamp(0.98rem, 3.4vw, 1.34rem);
+  font-size: clamp(0.9rem, 3.1vw, 1.2rem);
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -667,11 +691,11 @@ input, select, .btn {
   box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
 }
 .ball--large .ball__face {
-  width: 50%;
-  border-width: 5px;
+  width: 54%;
+  border-width: 3px;
   border-color: #000;
 }
-.ball--large .ball__face span { font-size: 3.9rem; font-weight: 800; letter-spacing: -0.01em; }
+.ball--large .ball__face span { font-size: 3.4rem; font-weight: 800; letter-spacing: -0.01em; }
 
 .myBallDock { display: flex; flex-wrap: wrap; gap: 6px; }
 .myBallDock .ball { width: 38px; }
@@ -680,12 +704,14 @@ input, select, .btn {
 .headerBallIndicator { display: flex; gap: 6px; align-items: center; }
 .headerBallIndicator .ball { width: 42px; }
 .headerBallIndicator .ball { height: 42px; }
-.headerBallIndicator .ball .ball__face { width: 50%; }
-.headerBallIndicator .ball .ball__face span { font-size: 0.64rem; letter-spacing: -0.01em; }
+.headerBallIndicator .ball .ball__face { width: 54%; }
+.headerBallIndicator .ball .ball__face span { font-size: 0.62rem; letter-spacing: -0.01em; }
 .headerBallIndicatorWrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-end;
+  min-height: 42px;
 }
 .headerBallToggle {
   width: 42px;
@@ -709,6 +735,20 @@ input, select, .btn {
   height: 100%;
   display: block;
 }
+.headerBallTray {
+  position: absolute;
+  right: 46px;
+  top: 50%;
+  transform: translate(16px, -50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 260ms ease, opacity 220ms ease;
+}
+.headerBallTray--open {
+  transform: translate(0, -50%);
+  opacity: 1;
+  pointer-events: auto;
+}
 
 .orderRow { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); }
 .orderCard {
@@ -727,7 +767,10 @@ input, select, .btn {
   border-radius: 12px;
   padding: 8px;
   display: grid;
+  grid-template-rows: auto minmax(22px, auto) minmax(22px, auto);
+  align-content: start;
   gap: 6px;
+  min-height: 132px;
   background: #fff;
 }
 .playerMiniCard--turn { border-color: #111; box-shadow: inset 0 0 0 2px #111; }
@@ -758,7 +801,9 @@ input, select, .btn {
   gap: 4px;
   min-height: 22px;
   justify-content: center;
+  align-content: flex-start;
 }
+.playerMiniAssigned--hidden { visibility: hidden; }
 .playerMiniAssigned .ball {
   width: 18px;
   height: 18px;
@@ -767,8 +812,12 @@ input, select, .btn {
 .playerMiniAssigned .ball .ball__face {
   border-width: 1px;
 }
+.playerMiniAssigned .ball.ball--sunk::after {
+  height: 4px;
+  top: calc(50% - 2px);
+}
 
-.playerMiniPots { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; justify-content: center; }
+.playerMiniPots { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; justify-content: center; align-content: flex-start; }
 .playerMiniPots .ball { width: 20px; border-width: 2px; }
 .playerMiniPots .ball { height: 20px; }
 .playerMiniPots .ball .ball__face { border-width: 1px; }
@@ -1223,6 +1272,23 @@ input, select, .btn {
   margin: 0;
   font-size: 1.2rem;
 }
+.profileBackBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 2px solid #000;
+  background: #fff;
+  color: #111;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+}
+.profileBackBtn svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
 .profileStatsGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1360,6 +1426,11 @@ input, select, .btn {
 }
 .profileTable tr:last-child td {
   border-bottom: 0;
+}
+.profileBottomActions {
+  margin-top: 4px;
+  display: grid;
+  grid-template-columns: 1fr;
 }
 .profileStatusText {
   color: #5b6470;

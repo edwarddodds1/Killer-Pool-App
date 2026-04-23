@@ -708,13 +708,13 @@ export function RoomPage() {
                   </svg>
                 </span>
               </button>
-              {showHeaderBalls ? (
+              <div className={`headerBallTray ${showHeaderBalls ? 'headerBallTray--open' : ''}`} aria-hidden={!showHeaderBalls}>
                 <div className="headerBallIndicator">
                   {me.assignedBalls.map((ball) => (
                     <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
                   ))}
                 </div>
-              ) : null}
+              </div>
             </div>
           ) : (
             <div className="headerBallIndicator">
@@ -913,18 +913,18 @@ export function RoomPage() {
                     <small className="playerMiniName">{player.username}</small>
                     {isTurn ? <small className="turnBadge">TURN</small> : null}
                   </div>
-                  {room.mode !== 'killer' ? (
-                    <div className="playerMiniAssigned">
-                      {player.assignedBalls.map((ball) => (
-                        <BallIcon
-                          key={`assigned-${player.id}-${ball}`}
-                          ball={ball}
-                          sunk={room.sunkBalls.includes(ball)}
-                          showNumber={false}
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+                  <div className={`playerMiniAssigned ${room.mode === 'killer' ? 'playerMiniAssigned--hidden' : ''}`}>
+                    {room.mode !== 'killer'
+                      ? player.assignedBalls.map((ball) => (
+                          <BallIcon
+                            key={`assigned-${player.id}-${ball}`}
+                            ball={ball}
+                            sunk={room.sunkBalls.includes(ball)}
+                            showNumber={false}
+                          />
+                        ))
+                      : null}
+                  </div>
                   <div className="playerMiniPots">
                     {player.pottedBalls.map((ball, index) => (
                       <BallIcon key={`${ball}-${index}`} ball={ball} showNumber={false} />
@@ -942,8 +942,8 @@ export function RoomPage() {
 
       {room.status === 'results' ? (
         <section className="card card--pool">
-          <h2>Winner</h2>
-          <div className="stack">
+          <h2>Results</h2>
+          <div className="stack resultsList">
             <div className="playerRow resultsHeaderRow" aria-hidden="true">
               <span />
               <small className="resultsStats resultsStats--head">

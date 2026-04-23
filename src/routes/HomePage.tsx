@@ -14,7 +14,6 @@ import {
   timerScoreBelongsToProfile,
   saveProfile,
   signInAccount,
-  deleteCurrentAccount,
   upsertRoom,
   upsertRoomRemote,
 } from '../utils/store'
@@ -122,22 +121,6 @@ export function HomePage() {
     setAuthMode('signin')
     setAuthPassword('')
     setError('')
-  }
-
-  const onDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      'Delete your account? This removes your account credentials from this app.',
-    )
-    if (!confirmed) return
-    setError('')
-    try {
-      await deleteCurrentAccount()
-      setProfile(null)
-      setAuthMode('signin')
-      setAuthPassword('')
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Could not delete account.')
-    }
   }
 
   return (
@@ -309,16 +292,20 @@ export function HomePage() {
       </section>
       {profile ? (
         <footer className="homeSessionFooter">
-          <span>Signed in as <strong>{profile.username}</strong></span>
+          <span className="homeSessionFooter__identity">
+            Signed in as <strong>{profile.username}</strong>
+            <button type="button" className="homeSessionFooter__profileLink" onClick={() => navigate('/profile')} aria-label="Profile">
+              <svg viewBox="0 0 24 24" className="btn__iconSvg" aria-hidden="true">
+                <path
+                  d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Zm0 2.3c-3.9 0-7.2 2.1-8.3 5.2-.2.6.2 1.3.9 1.3h14.8c.7 0 1.1-.7.9-1.3-1.1-3.1-4.4-5.2-8.3-5.2Z"
+                  fill="currentColor"
+                />
+              </svg>
+            </button>
+          </span>
           <span className="homeSessionFooter__actions">
             <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
-              Switch account
-            </button>
-            <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>
               Sign out
-            </button>
-            <button type="button" className="homeSessionFooter__signOut" onClick={() => void onDeleteAccount()}>
-              Delete account
             </button>
           </span>
         </footer>

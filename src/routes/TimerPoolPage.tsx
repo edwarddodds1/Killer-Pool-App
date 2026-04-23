@@ -63,19 +63,39 @@ export function TimerPoolPage() {
       audioContextRef.current = ctx
       if (ctx.state === 'suspended') void ctx.resume()
 
-      const oscillator = ctx.createOscillator()
-      const gain = ctx.createGain()
-      oscillator.type = 'sine'
-      oscillator.frequency.setValueAtTime(920, ctx.currentTime)
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.24, ctx.currentTime + 0.01)
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.2)
-      oscillator.connect(gain)
-      gain.connect(ctx.destination)
-      oscillator.start()
-      oscillator.stop(ctx.currentTime + 0.22)
+      const startAt = ctx.currentTime + 0.01
+      const playTone = (frequency: number, offset: number) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'triangle'
+        osc.frequency.setValueAtTime(frequency, startAt + offset)
+        gain.gain.setValueAtTime(0.0001, startAt + offset)
+        gain.gain.exponentialRampToValueAtTime(0.35, startAt + offset + 0.015)
+        gain.gain.exponentialRampToValueAtTime(0.0001, startAt + offset + 0.16)
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(startAt + offset)
+        osc.stop(startAt + offset + 0.18)
+      }
+
+      playTone(820, 0)
+      playTone(1220, 0.18)
     } catch {
       // Beep is optional UX enhancement; ignore if blocked/unavailable.
+    }
+  }
+
+  const primeBeepAudio = () => {
+    try {
+      const AudioCtor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioCtor) return
+      const ctx = audioContextRef.current ?? new AudioCtor()
+      audioContextRef.current = ctx
+      if (ctx.state === 'suspended') void ctx.resume()
+    } catch {
+      // Ignore if browser blocks/doesn't support audio context.
     }
   }
 
@@ -107,6 +127,7 @@ export function TimerPoolPage() {
     const shouldCountdown = countdownEnabled && runningSince === null && (elapsedMs === 0 || runFinalized)
     if (shouldCountdown) {
       setError('')
+      primeBeepAudio()
       setCountdownRemaining(START_COUNTDOWN_SECONDS)
       return
     }
@@ -203,7 +224,7 @@ export function TimerPoolPage() {
             onChange={(event) => setCountdownEnabled(event.target.checked)}
             disabled={runningSince !== null || countdownRemaining !== null || saving}
           />
-          Optional 5-second start countdown with beep
+          5s countdown
         </label>
         <section className="timerRules" aria-label="Timer rules">
           <h2 className="timerRules__title">Rules</h2>
@@ -211,6 +232,7 @@ export function TimerPoolPage() {
             <li>Pot all balls as quick as possible.</li>
             <li>All balls must be stationary between shots.</li>
             <li>Potting the white is a restart from the line.</li>
+            <li>Touching a ball to your advantage incurs a 10-second time penalty.</li>
           </ul>
         </section>
         {error ? <p className="error">{error}</p> : null}
