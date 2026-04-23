@@ -429,7 +429,7 @@ export function TimerResultsPage() {
                   <span>#{index + 1}</span>
                   <span className="timerRowUser">{entry.username}</span>
                   <div className="timerRowActions">
-                    <small>{entry.runs} runs</small>
+                    <small>{entry.runs} {entry.runs === 1 ? 'run' : 'runs'}</small>
                     <strong>{formatTimerElapsedMs(entry.averageMs)}</strong>
                   </div>
                 </div>

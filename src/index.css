@@ -1358,6 +1358,18 @@ input, select, .btn {
   stroke: #d5dee9;
   stroke-width: 1;
 }
+.profileLineAverage {
+  stroke: #f97316;
+  stroke-width: 2;
+  stroke-dasharray: 7 5;
+}
+.profileLineAverageLabel {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #9a3412;
+}
 .profileBars {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));

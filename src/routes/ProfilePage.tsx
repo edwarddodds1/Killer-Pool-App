@@ -95,6 +95,8 @@ export function ProfilePage() {
           { y: 0, value: TICK_MS, label: formatTimerElapsedMs(TICK_MS) },
           { y: height, value: 0, label: formatTimerElapsedMs(0) },
         ] as Array<{ y: number; value: number; label: string }>,
+        averageValue: 0,
+        averageY: height,
       }
     }
     const worstRun = Math.max(...progressRuns.map((run) => run.elapsedMs))
@@ -105,6 +107,8 @@ export function ProfilePage() {
       const y = height - (run.elapsedMs / axisMax) * height
       return { x, y, run }
     })
+    const averageValue = Math.round(progressRuns.reduce((sum, run) => sum + run.elapsedMs, 0) / progressRuns.length)
+    const averageY = height - (averageValue / axisMax) * height
     const ticks = Array.from({ length: Math.floor(axisMax / TICK_MS) + 1 }, (_, index) => {
       const value = axisMax - index * TICK_MS
       const y = height - (value / axisMax) * height
@@ -117,6 +121,8 @@ export function ProfilePage() {
       path: buildLinePath(points.map((p) => ({ x: p.x, y: p.y }))),
       points,
       ticks,
+      averageValue,
+      averageY,
     }
   }, [progressRuns])
 
@@ -229,7 +235,7 @@ export function ProfilePage() {
         </section>
 
         <section className="profileChartSection">
-          <h3>Run Progress ({progressRuns.length || 0} total runs)</h3>
+          <h3>Run Progress</h3>
           {lineChart.points.length ? (
             <div className="profileChartSurface profileChartSurface--progress">
               <div className="profileChartAxis" aria-hidden>
@@ -254,6 +260,13 @@ export function ProfilePage() {
                       className="profileLineGrid"
                     />
                   ))}
+                  <line
+                    x1={0}
+                    x2={lineChart.width}
+                    y1={lineChart.averageY}
+                    y2={lineChart.averageY}
+                    className="profileLineAverage"
+                  />
                   <path d={lineChart.path} fill="none" stroke="#0f172a" strokeWidth="2.75" strokeLinecap="round" />
                   {lineChart.points.length <= 140
                     ? lineChart.points.map((point) => (
@@ -261,6 +274,9 @@ export function ProfilePage() {
                       ))
                     : null}
                 </svg>
+                <small className="profileLineAverageLabel">
+                  Average: {formatTimerElapsedMs(lineChart.averageValue)}
+                </small>
               </div>
             </div>
           ) : (
