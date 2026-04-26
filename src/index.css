@@ -1233,7 +1233,7 @@ input, select, .btn {
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
 .timerRow--recent {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto auto auto minmax(40px, 1fr);
 }
 .timerRecentDate {
   font-size: 0.78rem;
@@ -1245,11 +1245,12 @@ input, select, .btn {
   font-variant-numeric: tabular-nums;
 }
 .timerRecentValue--date {
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   color: #5a6169;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 118px;
 }
 .timerRowActions {
   justify-self: end;
