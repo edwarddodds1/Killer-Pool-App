@@ -676,11 +676,7 @@ export async function updateTimerScoreElapsedMs(
 ) {
   const local = getTimerScoresLocal()
   const nextLocal = local.map((score) => {
-    if (
-      score.profileId === input.profileId &&
-      score.elapsedMs === input.elapsedMs &&
-      score.createdAt === input.createdAt
-    ) {
+    if (score.profileId === input.profileId && score.createdAt === input.createdAt) {
       return { ...score, elapsedMs: input.nextElapsedMs }
     }
     return score
@@ -689,14 +685,18 @@ export async function updateTimerScoreElapsedMs(
 
   if (!supabase) return
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from(TIMER_SCORES_TABLE)
     .update({ elapsed_ms: input.nextElapsedMs })
     .eq('profile_id', input.profileId)
-    .eq('elapsed_ms', input.elapsedMs)
     .eq('created_at', input.createdAt)
+    .select('profile_id')
+    .maybeSingle()
   if (error) {
     throw new Error(formatSupabaseError('Could not update timer attempt.', error.message))
+  }
+  if (!data) {
+    throw new Error('Could not update timer attempt. The score record was not found.')
   }
 }
 
