@@ -8,6 +8,7 @@ import {
   getKillerPoolStats,
   getProfile,
   getTimerScores,
+  getTimerScoresLocal,
   updateTimerScoreElapsedMs,
 } from '../utils/store'
 
@@ -99,6 +100,11 @@ export function ProfilePage() {
   const reloadScores = async () => {
     setError('')
     try {
+      // Hydrate instantly from local cache for fast back/forward navigation.
+      const local = getTimerScoresLocal()
+      if (local.length) {
+        setScores(local)
+      }
       await flushPendingTimerScores()
       setScores(await getTimerScores())
     } catch (loadError) {
@@ -653,7 +659,7 @@ export function ProfilePage() {
                 <thead>
                   <tr>
                     <th className="profileTableColTime">Time</th>
-                    <th className="profileTableColPb">Personal Best</th>
+                    <th className="profileTableColPb">PB</th>
                     <th className="profileTableColAvgDiff">Average difference</th>
                     {isAdmin ? <th className="profileActionsColHead" aria-label="Actions" /> : null}
                   </tr>
@@ -743,7 +749,6 @@ export function ProfilePage() {
         <div className="profileEditModalOverlay" role="dialog" aria-modal="true" aria-label="Edit attempt time">
           <div className="profileEditModal">
             <h3>Edit attempt time</h3>
-            <p className="muted">Use format MM:SS.CS (example 01:23.45).</p>
             <input
               type="text"
               className="profileTableEditInput profileTableEditInput--modal"

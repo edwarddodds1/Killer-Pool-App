@@ -244,8 +244,8 @@ h2 { font-size: 1.2rem; }
 .card.card--pool > * {
   position: relative;
   z-index: 1;
-  margin-left: 2px;
-  margin-right: 2px;
+  margin: 3px 4px;
+  box-sizing: border-box;
 }
 .card.card--pool .muted,
 .card.card--pool .ready {
@@ -1695,12 +1695,13 @@ input, select, .btn {
   color: #4a525f;
 }
 .profileTableColTime {
-  width: 36%;
+  width: 32%;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 .profileTableColPb {
-  width: 24%;
+  width: 28%;
+  text-align: center;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -1966,10 +1967,11 @@ input, select, .btn {
     font-size: 0.58rem;
   }
   .profileTableColTime {
-    width: 38%;
+    width: 34%;
   }
   .profileTableColPb {
-    width: 22%;
+    width: 26%;
+    text-align: center;
   }
   .profileTableColAvgDiff {
     width: 40%;

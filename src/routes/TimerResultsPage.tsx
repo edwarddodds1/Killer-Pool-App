@@ -11,6 +11,7 @@ import {
   flushPendingTimerScores,
   getProfile,
   getTimerScores,
+  getTimerScoresLocal,
 } from '../utils/store'
 import { isSupabaseEnabled } from '../lib/supabase'
 
@@ -109,6 +110,11 @@ export function TimerResultsPage() {
   const loadScores = async () => {
     setError('')
     try {
+      // Hydrate instantly from local cache for fast back/forward navigation.
+      const local = getTimerScoresLocal()
+      if (local.length) {
+        setScores(local)
+      }
       await flushPendingTimerScores()
       const nextScores = await getTimerScores()
       setScores(nextScores)
@@ -213,6 +219,7 @@ export function TimerResultsPage() {
 
     try {
       await deleteTimerScore({
+        id: score.id,
         profileId: score.profileId,
         elapsedMs: score.elapsedMs,
         createdAt: score.createdAt,

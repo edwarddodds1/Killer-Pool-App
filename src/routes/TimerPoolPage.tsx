@@ -83,6 +83,10 @@ export function TimerPoolPage() {
 
       playTone(820, 0)
       playTone(1220, 0.24)
+      // Add haptic fallback for devices/browsers where audio is muted by system mode.
+      if (typeof navigator.vibrate === 'function') {
+        navigator.vibrate([100, 70, 120])
+      }
     } catch {
       // Beep is optional UX enhancement; ignore if blocked/unavailable.
     }
@@ -107,6 +111,20 @@ export function TimerPoolPage() {
       gain.connect(ctx.destination)
       osc.start(ctx.currentTime)
       osc.stop(ctx.currentTime + 0.02)
+
+      // Also prime a very short audible unlock pulse so subsequent countdown beeps
+      // are less likely to be blocked on restrictive mobile browsers.
+      const unlockOsc = ctx.createOscillator()
+      const unlockGain = ctx.createGain()
+      unlockOsc.type = 'sine'
+      unlockOsc.frequency.setValueAtTime(660, ctx.currentTime + 0.03)
+      unlockGain.gain.setValueAtTime(0.0001, ctx.currentTime + 0.03)
+      unlockGain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.05)
+      unlockGain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.11)
+      unlockOsc.connect(unlockGain)
+      unlockGain.connect(ctx.destination)
+      unlockOsc.start(ctx.currentTime + 0.03)
+      unlockOsc.stop(ctx.currentTime + 0.12)
     } catch {
       // Ignore if browser blocks/doesn't support audio context.
     }

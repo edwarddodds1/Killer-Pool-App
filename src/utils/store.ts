@@ -658,23 +658,28 @@ export async function addTimerScore(input: Omit<TimerScore, 'createdAt' | 'pendi
   saveTimerScoresLocal(sortTimerScores([...without, synced]))
 }
 
-export async function deleteTimerScore(input: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'>) {
+export async function deleteTimerScore(input: Pick<TimerScore, 'id' | 'profileId' | 'elapsedMs' | 'createdAt'>) {
   const local = getTimerScoresLocal()
   const nextLocal = local.filter(
     (score) =>
       !(
-        score.profileId === input.profileId &&
-        score.elapsedMs === input.elapsedMs &&
-        score.createdAt === input.createdAt
+        (input.id !== undefined && score.id === input.id) ||
+        (score.profileId === input.profileId &&
+          score.elapsedMs === input.elapsedMs &&
+          score.createdAt === input.createdAt)
       ),
   )
   saveTimerScoresLocal(nextLocal)
 
   if (!supabase) return
 
-  await supabase
-    .from(TIMER_SCORES_TABLE)
-    .delete()
+  const query = supabase.from(TIMER_SCORES_TABLE).delete()
+  if (input.id !== undefined) {
+    await query.eq('id', input.id)
+    return
+  }
+
+  await query
     .eq('profile_id', input.profileId)
     .eq('elapsed_ms', input.elapsedMs)
     .eq('created_at', input.createdAt)
