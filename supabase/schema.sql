@@ -32,7 +32,7 @@ create table if not exists public.timer_pool_scores (
 );
 
 alter table public.timer_pool_scores enable row level security;
-grant select, insert, delete on table public.timer_pool_scores to anon, authenticated;
+grant select, insert, update, delete on table public.timer_pool_scores to anon, authenticated;
 grant usage, select on sequence public.timer_pool_scores_id_seq to anon, authenticated;
 
 drop policy if exists "timer_pool_scores_all_select" on public.timer_pool_scores;
@@ -55,6 +55,14 @@ on public.timer_pool_scores
 for delete
 to anon, authenticated
 using (true);
+
+drop policy if exists "timer_pool_scores_all_update" on public.timer_pool_scores;
+create policy "timer_pool_scores_all_update"
+on public.timer_pool_scores
+for update
+to anon, authenticated
+using (true)
+with check (true);
 
 create table if not exists public.user_accounts (
   profile_id text primary key,

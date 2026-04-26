@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
 import {
@@ -95,6 +95,7 @@ export function TimerResultsPage() {
   const [selectedRunKey, setSelectedRunKey] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [deletingRunKey, setDeletingRunKey] = useState<string | null>(null)
+  const deferredScores = useDeferredValue(scores)
 
   const invalidRun = searchParams.get('invalid') === '1'
 
@@ -123,11 +124,11 @@ export function TimerResultsPage() {
 
   const userRuns = useMemo(() => {
     if (!profile) return []
-    return scores
+    return deferredScores
       .filter((s) => timerScoreBelongsToProfile(s, profile))
       .slice()
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  }, [scores, profile])
+  }, [deferredScores, profile])
 
   const userBest = userRuns.reduce<TimerScore | null>((best, s) => {
     if (!best) return s
@@ -138,8 +139,8 @@ export function TimerResultsPage() {
     : null
 
   const allRankedRuns = useMemo(
-    () => scores.slice().sort((a, b) => a.elapsedMs - b.elapsedMs),
-    [scores],
+    () => deferredScores.slice().sort((a, b) => a.elapsedMs - b.elapsedMs),
+    [deferredScores],
   )
 
   const leaderboard = useMemo(() => {
@@ -158,7 +159,7 @@ export function TimerResultsPage() {
       }
     >()
 
-    for (const score of scores) {
+    for (const score of deferredScores) {
       const key = score.profileId || score.username.trim().toLowerCase()
       const existing = grouped.get(key)
       if (existing) {
@@ -181,15 +182,19 @@ export function TimerResultsPage() {
       }))
       .sort((a, b) => a.averageMs - b.averageMs)
       .slice(0, 10)
-  }, [scores])
+  }, [deferredScores])
 
-  const hasPendingSync = useMemo(() => scores.some((s) => s.pendingSync), [scores])
+  const hasPendingSync = useMemo(() => deferredScores.some((s) => s.pendingSync), [deferredScores])
 
-  const bestRuns = userRuns
-    .slice()
-    .sort((a, b) => a.elapsedMs - b.elapsedMs)
-    .slice(0, 3)
-  const recent3Runs = userRuns.slice(0, 3)
+  const bestRuns = useMemo(
+    () =>
+      userRuns
+        .slice()
+        .sort((a, b) => a.elapsedMs - b.elapsedMs)
+        .slice(0, 3),
+    [userRuns],
+  )
+  const recent3Runs = useMemo(() => userRuns.slice(0, 3), [userRuns])
 
   const onDeleteRun = async (score: TimerScore) => {
     if (!profile) return

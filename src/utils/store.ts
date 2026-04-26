@@ -182,6 +182,14 @@ const ACCOUNTS_TABLE = 'user_accounts'
 
 function formatSupabaseError(prefix: string, message?: string) {
   if (!message) return prefix
+  const normalized = message.toLowerCase()
+  if (
+    normalized.includes('permission denied') ||
+    normalized.includes('row-level security') ||
+    normalized.includes('violates row-level security policy')
+  ) {
+    return `${prefix} (database permissions blocked this update. Ensure timer_pool_scores has UPDATE grant + UPDATE policy.)`
+  }
   return `${prefix} (${message})`
 }
 
@@ -673,11 +681,15 @@ export async function deleteTimerScore(input: Pick<TimerScore, 'profileId' | 'el
 }
 
 export async function updateTimerScoreElapsedMs(
-  input: Pick<TimerScore, 'id' | 'profileId' | 'elapsedMs' | 'createdAt'> & { nextElapsedMs: number },
+  input: Pick<TimerScore, 'id' | 'profileId' | 'elapsedMs' | 'createdAt' | 'username'> & { nextElapsedMs: number },
 ) {
+  if (input.id === undefined) {
+    throw new Error('Could not update timer attempt. The score record is missing a cloud id.')
+  }
+
   const local = getTimerScoresLocal()
   const nextLocal = local.map((score) => {
-    const isTargetById = input.id !== undefined && score.id === input.id
+    const isTargetById = score.id === input.id
     const isTargetByFallback = score.profileId === input.profileId && score.createdAt === input.createdAt
     if (isTargetById || isTargetByFallback) {
       return { ...score, elapsedMs: input.nextElapsedMs }
@@ -686,19 +698,42 @@ export async function updateTimerScoreElapsedMs(
   })
   saveTimerScoresLocal(sortTimerScores(nextLocal))
 
-  if (!supabase) return
+  const localCanonical: TimerScore = {
+    id: input.id,
+    profileId: input.profileId,
+    username: input.username,
+    elapsedMs: input.nextElapsedMs,
+    createdAt: input.createdAt,
+    pendingSync: !supabase,
+  }
 
-  const query = supabase.from(TIMER_SCORES_TABLE).update({ elapsed_ms: input.nextElapsedMs })
-  const match = input.id !== undefined
-    ? query.eq('id', input.id)
-    : query.eq('profile_id', input.profileId).eq('created_at', input.createdAt)
-  const { data, error } = await match.select('id').maybeSingle()
+  if (!supabase) return localCanonical
+
+  const { data, error } = await supabase
+    .from(TIMER_SCORES_TABLE)
+    .update({ elapsed_ms: input.nextElapsedMs })
+    .eq('id', input.id)
+    .select('id, profile_id, username, elapsed_ms, created_at')
+    .single()
   if (error) {
     throw new Error(formatSupabaseError('Could not update timer attempt.', error.message))
   }
   if (!data) {
     throw new Error('Could not update timer attempt. The score record was not found.')
   }
+  const normalized = normalizeTimerScore(data as TimerScoreRow)
+  if (normalized.id !== input.id) {
+    throw new Error('Could not update timer attempt. Unexpected score record updated.')
+  }
+
+  const latestLocal = getTimerScoresLocal()
+  const reconciledLocal = latestLocal.map((score) =>
+    score.id === input.id
+      ? { ...normalized, pendingSync: false }
+      : score,
+  )
+  saveTimerScoresLocal(sortTimerScores(reconciledLocal))
+  return { ...normalized, pendingSync: false }
 }
 
 export function subscribeRoomRemote(

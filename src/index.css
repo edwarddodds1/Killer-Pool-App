@@ -244,6 +244,8 @@ h2 { font-size: 1.2rem; }
 .card.card--pool > * {
   position: relative;
   z-index: 1;
+  margin-left: 2px;
+  margin-right: 2px;
 }
 .card.card--pool .muted,
 .card.card--pool .ready {
@@ -1451,6 +1453,12 @@ input, select, .btn {
   gap: 3px;
   margin-top: 6px;
 }
+.profileFormRatingBtn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
 .profileFormLabel {
   margin-right: 4px;
   font-size: 0.76rem;
@@ -1677,24 +1685,19 @@ input, select, .btn {
   padding: 8px 8px;
   text-align: left;
   border-bottom: 1px solid #eceff3;
-  font-size: 0.79rem;
+  font-size: 0.75rem;
   line-height: 1.25;
 }
 .profileTable th {
-  font-size: 0.69rem;
+  font-size: 0.64rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #4a525f;
 }
 .profileTableColTime {
-  width: 16%;
+  width: 36%;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-}
-.profileTableColDate {
-  width: 34%;
-  white-space: normal;
-  overflow-wrap: anywhere;
 }
 .profileTableColPb {
   width: 24%;
@@ -1702,9 +1705,21 @@ input, select, .btn {
   font-variant-numeric: tabular-nums;
 }
 .profileTableColAvgDiff {
-  width: 26%;
+  width: 40%;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.profileTableColTime--date {
+  font-size: 0.68rem;
+  color: #5a6169;
+}
+.profileTableRowSelectable {
+  cursor: pointer;
+  content-visibility: auto;
+  contain-intrinsic-size: 34px;
+}
+.profileTableRowSelectable--selected td {
+  background: #f1f3f6 !important;
 }
 .profileTable tbody tr:nth-child(odd) td {
   background: #ffffff;
@@ -1790,7 +1805,7 @@ input, select, .btn {
   font-size: 0.95rem;
 }
 .profileActionsColHead {
-  width: 54px;
+  width: 46px;
 }
 .profileEditModalOverlay {
   position: fixed;
@@ -1819,6 +1834,35 @@ input, select, .btn {
   grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
+.profileFormInfoModal {
+  width: min(460px, 100%);
+}
+.profileFormInfoChartWrap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+.profileFormInfoChart {
+  display: block;
+}
+.profileFormInfoLegend {
+  display: grid;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: #1f2937;
+}
+.profileFormInfoLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.profileFormInfoSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
 .timerHomeBtn--small {
   border: 0;
   background: transparent;
@@ -1829,6 +1873,10 @@ input, select, .btn {
   cursor: pointer;
 }
 .timerRowUser { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timerRow {
+  content-visibility: auto;
+  contain-intrinsic-size: 36px;
+}
 
 .leaveGameBtn {
   border: 0;
@@ -1878,6 +1926,14 @@ input, select, .btn {
   .profileStatsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .profileFormInfoChartWrap {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: left;
+  }
+  .profileFormInfoLegend {
+    width: 100%;
+  }
   .profileCardHeader {
     align-items: flex-start;
     flex-wrap: wrap;
@@ -1903,20 +1959,20 @@ input, select, .btn {
   }
   .profileTable th,
   .profileTable td {
-    padding: 7px 6px;
-    font-size: 0.74rem;
+    padding: 6px 5px;
+    font-size: 0.68rem;
   }
   .profileTable th {
-    font-size: 0.63rem;
+    font-size: 0.58rem;
   }
-  .profileTableColDate {
-    width: 30%;
+  .profileTableColTime {
+    width: 38%;
   }
   .profileTableColPb {
-    width: 28%;
+    width: 22%;
   }
   .profileTableColAvgDiff {
-    width: 26%;
+    width: 40%;
   }
   .card { padding: 16px 12px; gap: 10px; }
   .card.header {

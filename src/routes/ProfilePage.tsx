@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
 import { formatTimerElapsedMs, timerScoreBelongsToProfile, timerScoreKey } from '../../shared/timerLeaderboard'
@@ -50,6 +50,33 @@ function clamp05To5(value: number) {
   return Math.max(0.5, Math.min(5, value))
 }
 
+function mean(values: number[]) {
+  if (!values.length) return null
+  return values.reduce((total, value) => total + value, 0) / values.length
+}
+
+function standardDeviation(values: number[]) {
+  const avg = mean(values)
+  if (avg === null) return null
+  const variance = values.reduce((total, value) => total + (value - avg) ** 2, 0) / values.length
+  return Math.sqrt(variance)
+}
+
+function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
+  const angleRad = ((angleDeg - 90) * Math.PI) / 180
+  return {
+    x: cx + r * Math.cos(angleRad),
+    y: cy + r * Math.sin(angleRad),
+  }
+}
+
+function describeFormComponent(component: number) {
+  if (component >= 0.8) return 'Excellent'
+  if (component >= 0.6) return 'Strong'
+  if (component >= 0.4) return 'Average'
+  return 'Needs work'
+}
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const { profileId } = useParams<{ profileId?: string }>()
@@ -60,6 +87,9 @@ export function ProfilePage() {
   const [editingRunKey, setEditingRunKey] = useState<string | null>(null)
   const [editingRun, setEditingRun] = useState<TimerScore | null>(null)
   const [editingSeconds, setEditingSeconds] = useState('')
+  const [selectedAttemptKey, setSelectedAttemptKey] = useState<string | null>(null)
+  const [showFormInfo, setShowFormInfo] = useState(false)
+  const deferredScores = useDeferredValue(scores)
   const requestedUsername = (searchParams.get('username') ?? '').trim()
   const isAdmin = useMemo(() => {
     if (!profile) return false
@@ -89,7 +119,7 @@ export function ProfilePage() {
   const profileRuns = useMemo(() => {
     if (!profile && viewingOwnProfile) return []
     const normalizedRequestedName = requestedUsername.toLowerCase()
-    return scores
+    return deferredScores
       .filter((score) => {
         if (viewingOwnProfile) {
           if (!profile) return false
@@ -101,7 +131,7 @@ export function ProfilePage() {
       })
       .slice()
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  }, [profile, profileId, requestedUsername, scores, viewingOwnProfile])
+  }, [deferredScores, profile, profileId, requestedUsername, viewingOwnProfile])
 
   const profileDisplayName = useMemo(() => {
     if (viewingOwnProfile) return profile?.username ?? 'Player'
@@ -128,8 +158,8 @@ export function ProfilePage() {
   const killerWinPct = killerPoolStats.games > 0 ? Math.round((killerPoolStats.wins / killerPoolStats.games) * 100) : null
   const timerRank = useMemo(() => {
     if (!bestRun) return null
-    return scores.filter((run) => run.elapsedMs < bestRun.elapsedMs).length + 1
-  }, [bestRun, scores])
+    return deferredScores.filter((run) => run.elapsedMs < bestRun.elapsedMs).length + 1
+  }, [bestRun, deferredScores])
   const fiveGameAverageMs = useMemo(() => {
     if (!profileRuns.length) return null
     const recentRuns = profileRuns.slice(0, 5)
@@ -227,7 +257,7 @@ export function ProfilePage() {
   const personalRank = useMemo(() => {
     if (!bestRun) return null
     const allBestByPlayer = new Map<string, number>()
-    for (const run of scores) {
+    for (const run of deferredScores) {
       const key = run.profileId || run.username.trim().toLowerCase()
       const current = allBestByPlayer.get(key)
       if (current === undefined || run.elapsedMs < current) {
@@ -236,24 +266,86 @@ export function ProfilePage() {
     }
     const fasterPlayers = [...allBestByPlayer.values()].filter((elapsed) => elapsed < bestRun.elapsedMs).length
     return fasterPlayers + 1
-  }, [bestRun, scores])
+  }, [bestRun, deferredScores])
+  const activePlayerCount = useMemo(() => {
+    const allBestByPlayer = new Map<string, number>()
+    for (const run of deferredScores) {
+      const key = run.profileId || run.username.trim().toLowerCase()
+      const current = allBestByPlayer.get(key)
+      if (current === undefined || run.elapsedMs < current) {
+        allBestByPlayer.set(key, run.elapsedMs)
+      }
+    }
+    return allBestByPlayer.size
+  }, [deferredScores])
 
-  const formRating = useMemo(() => {
-    if (!bestRun || averageMs === null || fiveGameAverageMs === null) return 0
+  const formBreakdown = useMemo(() => {
+    if (!bestRun || !profileRuns.length) {
+      return {
+        rating: 0,
+        slices: [] as Array<{ key: string; label: string; weight: number; score: number; color: string }>,
+      }
+    }
+    if (profileRuns.length < 3) {
+      return {
+        rating: 2.5,
+        slices: [] as Array<{ key: string; label: string; weight: number; score: number; color: string }>,
+      }
+    }
     const pbMs = bestRun.elapsedMs
-    const recentImprovement = averageMs > 0 ? (averageMs - fiveGameAverageMs) / averageMs : 0
-    const recentComponent = clamp01(0.5 + recentImprovement * 2)
-    const pbClosenessComponent = clamp01(1 - (fiveGameAverageMs - pbMs) / (pbMs * 0.35))
-    const consistencyComponent = clamp01(1 - (averageMs - pbMs) / (pbMs * 0.6))
-    const rankingComponent = personalRank ? clamp01(1 - (personalRank - 1) / 24) : 0.5
-    const weightedScore =
-      recentComponent * 0.35 +
-      pbClosenessComponent * 0.25 +
+    const recent5 = profileRuns.slice(0, 5).map((run) => run.elapsedMs)
+    const recent10 = profileRuns.slice(0, 10).map((run) => run.elapsedMs)
+    const recent20 = profileRuns.slice(0, 20).map((run) => run.elapsedMs)
+    const avg5 = mean(recent5) ?? pbMs
+    const avg20 = mean(recent20) ?? avg5
+    const std10 = standardDeviation(recent10) ?? 0
+
+    const trendComponent = clamp01(0.6 + ((avg20 - avg5) / Math.max(1, avg20)) * 2.4)
+    const pbClosenessComponent = clamp01(1 - (avg5 - pbMs) / Math.max(1, pbMs * 0.5))
+    const consistencyComponent = clamp01(1 - std10 / Math.max(1, pbMs * 0.28))
+
+    const competitivenessComponent =
+      personalRank && activePlayerCount > 1
+        ? clamp01(1 - (personalRank - 1) / (activePlayerCount - 1))
+        : 0.5
+
+    const score01 =
+      trendComponent * 0.3 +
+      pbClosenessComponent * 0.3 +
       consistencyComponent * 0.15 +
-      rankingComponent * 0.25
-    const outOfFive = clamp05To5(weightedScore * 5)
-    return Math.round(outOfFive * 2) / 2
-  }, [averageMs, bestRun, fiveGameAverageMs, personalRank])
+      competitivenessComponent * 0.25
+    const stars = clamp05To5(1 + score01 * 4)
+    return {
+      rating: Math.round(stars * 2) / 2,
+      slices: [
+        { key: 'trend', label: 'Trend', weight: 0.3, score: trendComponent, color: '#3b82f6' },
+        { key: 'pb', label: 'PB Closeness', weight: 0.3, score: pbClosenessComponent, color: '#8b5cf6' },
+        { key: 'consistency', label: 'Consistency', weight: 0.15, score: consistencyComponent, color: '#10b981' },
+        {
+          key: 'competitiveness',
+          label: 'Competitiveness',
+          weight: 0.25,
+          score: competitivenessComponent,
+          color: '#f59e0b',
+        },
+      ],
+    }
+  }, [activePlayerCount, bestRun, personalRank, profileRuns])
+  const formRating = formBreakdown.rating
+  const pieRadius = 58
+  const pieSize = pieRadius * 2 + 8
+  let pieStart = 0
+  const pieSlices = formBreakdown.slices.map((slice) => {
+    const angle = slice.weight * 360
+    const startAngle = pieStart
+    const endAngle = pieStart + angle
+    pieStart = endAngle
+    const start = polarToCartesian(pieSize / 2, pieSize / 2, pieRadius, startAngle)
+    const end = polarToCartesian(pieSize / 2, pieSize / 2, pieRadius, endAngle)
+    const largeArcFlag = angle > 180 ? 1 : 0
+    const d = `M ${pieSize / 2} ${pieSize / 2} L ${start.x} ${start.y} A ${pieRadius} ${pieRadius} 0 ${largeArcFlag} 1 ${end.x} ${end.y} Z`
+    return { ...slice, d }
+  })
 
   const onDeleteAccount = async () => {
     const confirmed = window.confirm('Delete your account? This removes your account credentials from this app.')
@@ -267,11 +359,29 @@ export function ProfilePage() {
     }
   }
 
-  const onStartEditRun = (run: TimerScore) => {
+  const onStartEditRun = async (run: TimerScore) => {
     if (!isAdmin) return
+    let runToEdit = run
+    if (runToEdit.id === undefined) {
+      try {
+        await flushPendingTimerScores()
+        const latestScores = await getTimerScores()
+        setScores(latestScores)
+        const refreshed = latestScores.find((entry) => timerScoreKey(entry) === timerScoreKey(run))
+        if (refreshed?.id !== undefined) {
+          runToEdit = refreshed
+        } else {
+          setError('This attempt is not cloud-identified yet. Refresh and retry.')
+          return
+        }
+      } catch (loadError) {
+        setError(loadError instanceof Error ? loadError.message : 'Could not refresh attempts for editing.')
+        return
+      }
+    }
     setError('')
-    setEditingRun(run)
-    setEditingSeconds(formatTimerElapsedMs(run.elapsedMs))
+    setEditingRun(runToEdit)
+    setEditingSeconds(formatTimerElapsedMs(runToEdit.elapsedMs))
   }
 
   const onCancelEditRun = () => {
@@ -282,6 +392,10 @@ export function ProfilePage() {
   const onSaveEditRun = async () => {
     if (!isAdmin) return
     if (!editingRun) return
+    if (editingRun.id === undefined) {
+      setError('This attempt is not cloud-identified yet. Refresh and retry.')
+      return
+    }
 
     const nextElapsedMs = parseFormattedTimerInput(editingSeconds)
     if (nextElapsedMs === null) {
@@ -294,11 +408,12 @@ export function ProfilePage() {
     }
 
     const runKey = timerScoreKey(editingRun)
+    const previousRunSnapshot = editingRun
     setError('')
     setEditingRunKey(runKey)
     setScores((current) =>
       current.map((entry) =>
-        (editingRun.id !== undefined && entry.id === editingRun.id) ||
+        (entry.id === editingRun.id) ||
         (entry.profileId === editingRun.profileId && entry.createdAt === editingRun.createdAt)
           ? { ...entry, elapsedMs: nextElapsedMs }
           : entry,
@@ -309,15 +424,32 @@ export function ProfilePage() {
     setEditingSeconds('')
 
     try {
-      await updateTimerScoreElapsedMs({
+      const updated = await updateTimerScoreElapsedMs({
         id: editingRun.id,
         profileId: editingRun.profileId,
+        username: editingRun.username,
         elapsedMs: editingRun.elapsedMs,
         createdAt: editingRun.createdAt,
         nextElapsedMs,
       })
-    } catch {
-      setError('Time updated locally, but cloud sync failed. Please try saving again shortly.')
+      setScores((current) =>
+        current.map((entry) => (entry.id === updated.id ? { ...entry, ...updated } : entry)),
+      )
+    } catch (updateError) {
+      setScores((current) =>
+        current.map((entry) =>
+          (entry.id !== undefined && entry.id === previousRunSnapshot.id) ||
+          (entry.profileId === previousRunSnapshot.profileId &&
+            entry.createdAt === previousRunSnapshot.createdAt)
+            ? { ...entry, elapsedMs: previousRunSnapshot.elapsedMs }
+            : entry,
+        ),
+      )
+      setError(
+        updateError instanceof Error
+          ? `${updateError.message} The previous time has been restored.`
+          : 'Could not update timer attempt in the cloud. The previous time has been restored.',
+      )
     } finally {
       setEditingRunKey(null)
     }
@@ -361,7 +493,12 @@ export function ProfilePage() {
                 </div>
               ) : null}
             </div>
-            <div className="profileFormRating" aria-label={`Form rating ${formRating} out of 5`}>
+            <button
+              type="button"
+              className="profileFormRating profileFormRatingBtn"
+              aria-label={`Form rating ${formRating} out of 5. Open form breakdown.`}
+              onClick={() => setShowFormInfo(true)}
+            >
               <span className="profileFormLabel">Form</span>
               {Array.from({ length: 5 }, (_, index) => (
                 <svg
@@ -393,7 +530,7 @@ export function ProfilePage() {
                   />
                 </svg>
               ))}
-            </div>
+            </button>
           </div>
         </header>
 
@@ -516,7 +653,6 @@ export function ProfilePage() {
                 <thead>
                   <tr>
                     <th className="profileTableColTime">Time</th>
-                    <th className="profileTableColDate">Date</th>
                     <th className="profileTableColPb">Personal Best</th>
                     <th className="profileTableColAvgDiff">Average difference</th>
                     {isAdmin ? <th className="profileActionsColHead" aria-label="Actions" /> : null}
@@ -537,10 +673,19 @@ export function ProfilePage() {
                             : 'profileAvgDiff'
                     const runKey = timerScoreKey(run)
                     const editing = editingRunKey === runKey
+                    const showDate = selectedAttemptKey === runKey
                     return (
-                      <tr key={runKey}>
-                        <td className="profileTableColTime">{formatTimerElapsedMs(run.elapsedMs)}</td>
-                        <td className="profileTableColDate">{formatRunDate(run.createdAt)}</td>
+                      <tr
+                        key={runKey}
+                        className={`profileTableRowSelectable ${showDate ? 'profileTableRowSelectable--selected' : ''}`}
+                        onClick={() => {
+                          if (editingRunKey) return
+                          setSelectedAttemptKey((current) => (current === runKey ? null : runKey))
+                        }}
+                      >
+                        <td className={`profileTableColTime ${showDate ? 'profileTableColTime--date' : ''}`}>
+                          {showDate ? formatRunDate(run.createdAt) : formatTimerElapsedMs(run.elapsedMs)}
+                        </td>
                         <td className="profileTableColPb">{isBest ? 'PB' : `+${formatTimerElapsedMs(deltaMs)}`}</td>
                         <td className={`profileTableColAvgDiff ${averageDiffClassName}`.trim()}>
                           {averageDiffMs === null
@@ -554,10 +699,13 @@ export function ProfilePage() {
                             <button
                               type="button"
                               className="profileTableEditBtn profileTableEditBtn--icon"
-                              onClick={() => onStartEditRun(run)}
-                              disabled={editing}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void onStartEditRun(run)
+                              }}
+                              disabled={editing || run.id === undefined}
                               aria-label="Edit attempt"
-                              title="Edit"
+                              title={run.id === undefined ? 'Cannot edit until cloud id is available' : 'Edit'}
                             >
                               <svg viewBox="0 0 24 24" aria-hidden="true">
                                 <path
@@ -621,6 +769,54 @@ export function ProfilePage() {
                 disabled={editingRunKey !== null}
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {showFormInfo ? (
+        <div className="profileEditModalOverlay" role="presentation" onClick={() => setShowFormInfo(false)}>
+          <div
+            className="profileEditModal profileFormInfoModal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-form-info-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="profile-form-info-title">How Form is calculated</h3>
+            <p className="muted">
+              Your current Form is <strong>{formRating.toFixed(1)} / 5</strong>, based on weighted components.
+            </p>
+            {pieSlices.length ? (
+              <div className="profileFormInfoChartWrap">
+                <svg
+                  viewBox={`0 0 ${pieSize} ${pieSize}`}
+                  width={pieSize}
+                  height={pieSize}
+                  className="profileFormInfoChart"
+                  aria-label="Form weighting breakdown pie chart"
+                >
+                  {pieSlices.map((slice) => (
+                    <path key={slice.key} d={slice.d} fill={slice.color} stroke="#111" strokeWidth="1.3" />
+                  ))}
+                </svg>
+                <div className="profileFormInfoLegend">
+                  {pieSlices.map((slice) => (
+                    <div key={slice.key} className="profileFormInfoLegendRow">
+                      <span className="profileFormInfoSwatch" style={{ backgroundColor: slice.color }} aria-hidden="true" />
+                      <span>
+                        {slice.label}: {Math.round(slice.weight * 100)}% ({describeFormComponent(slice.score)})
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="muted">Play at least 3 runs to unlock full Form breakdown.</p>
+            )}
+            <div className="profileEditModalActions">
+              <button type="button" className="btn btn--primary" onClick={() => setShowFormInfo(false)}>
+                Close
               </button>
             </div>
           </div>
