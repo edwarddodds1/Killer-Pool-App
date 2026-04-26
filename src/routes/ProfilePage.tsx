@@ -19,6 +19,17 @@ function formatRunDate(iso: string) {
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
 }
 
+function parseFormattedTimerInput(value: string): number | null {
+  const trimmed = value.trim()
+  const match = trimmed.match(/^(\d{1,2}):([0-5]\d)\.(\d{2})$/)
+  if (!match) return null
+  const minutes = Number(match[1])
+  const seconds = Number(match[2])
+  const centiseconds = Number(match[3])
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || !Number.isFinite(centiseconds)) return null
+  return minutes * 60_000 + seconds * 1_000 + centiseconds * 10
+}
+
 function buildLinePath(points: Array<{ x: number; y: number }>) {
   if (!points.length) return ''
   return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
@@ -47,7 +58,7 @@ export function ProfilePage() {
   const [scores, setScores] = useState<TimerScore[]>([])
   const [error, setError] = useState('')
   const [editingRunKey, setEditingRunKey] = useState<string | null>(null)
-  const [editingTargetKey, setEditingTargetKey] = useState<string | null>(null)
+  const [editingRun, setEditingRun] = useState<TimerScore | null>(null)
   const [editingSeconds, setEditingSeconds] = useState('')
   const requestedUsername = (searchParams.get('username') ?? '').trim()
   const isAdmin = useMemo(() => {
@@ -55,23 +66,23 @@ export function ProfilePage() {
     return ADMIN_USERNAMES.has(profile.username.trim().toLowerCase())
   }, [profile])
 
+  const reloadScores = async () => {
+    setError('')
+    try {
+      await flushPendingTimerScores()
+      setScores(await getTimerScores())
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Could not load profile stats.')
+    }
+  }
+
   useEffect(() => {
     if (!profile) {
       navigate('/', { replace: true })
       return
     }
 
-    const load = async () => {
-      setError('')
-      try {
-        await flushPendingTimerScores()
-        setScores(await getTimerScores())
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : 'Could not load profile stats.')
-      }
-    }
-
-    void load()
+    void reloadScores()
   }, [navigate, profile])
 
   const viewingOwnProfile = !profileId
@@ -259,52 +270,54 @@ export function ProfilePage() {
   const onStartEditRun = (run: TimerScore) => {
     if (!isAdmin) return
     setError('')
-    setEditingTargetKey(timerScoreKey(run))
-    setEditingSeconds((run.elapsedMs / 1000).toFixed(2))
+    setEditingRun(run)
+    setEditingSeconds(formatTimerElapsedMs(run.elapsedMs))
   }
 
   const onCancelEditRun = () => {
-    setEditingTargetKey(null)
+    setEditingRun(null)
     setEditingSeconds('')
   }
 
-  const onSaveEditRun = async (run: TimerScore) => {
+  const onSaveEditRun = async () => {
     if (!isAdmin) return
+    if (!editingRun) return
 
-    const nextSeconds = Number(editingSeconds.trim())
-    if (!Number.isFinite(nextSeconds)) {
-      setError('Please enter a valid number of seconds.')
+    const nextElapsedMs = parseFormattedTimerInput(editingSeconds)
+    if (nextElapsedMs === null) {
+      setError('Please enter a valid time in format MM:SS.CS (for example 01:23.45).')
       return
     }
-
-    const nextElapsedMs = Math.round(nextSeconds * 1000)
     if (nextElapsedMs < MIN_VALID_TIMER_RUN_MS) {
       setError('Edited time must be at least 20.00 seconds.')
       return
     }
 
-    const runKey = timerScoreKey(run)
-    const previous = scores
+    const runKey = timerScoreKey(editingRun)
     setError('')
     setEditingRunKey(runKey)
     setScores((current) =>
-      current
-        .map((entry) => (timerScoreKey(entry) === runKey ? { ...entry, elapsedMs: nextElapsedMs } : entry))
-        .sort((a, b) => a.elapsedMs - b.elapsedMs),
+      current.map((entry) =>
+        (editingRun.id !== undefined && entry.id === editingRun.id) ||
+        (entry.profileId === editingRun.profileId && entry.createdAt === editingRun.createdAt)
+          ? { ...entry, elapsedMs: nextElapsedMs }
+          : entry,
+      ),
     )
+    // Close modal immediately while save call completes in background.
+    setEditingRun(null)
+    setEditingSeconds('')
 
     try {
       await updateTimerScoreElapsedMs({
-        profileId: run.profileId,
-        elapsedMs: run.elapsedMs,
-        createdAt: run.createdAt,
+        id: editingRun.id,
+        profileId: editingRun.profileId,
+        elapsedMs: editingRun.elapsedMs,
+        createdAt: editingRun.createdAt,
         nextElapsedMs,
       })
-      setEditingTargetKey(null)
-      setEditingSeconds('')
     } catch {
-      setScores(previous)
-      setError('Could not edit that attempt. Please try again.')
+      setError('Time updated locally, but cloud sync failed. Please try saving again shortly.')
     } finally {
       setEditingRunKey(null)
     }
@@ -506,71 +519,60 @@ export function ProfilePage() {
                     <th>Time</th>
                     <th>Date</th>
                     <th>Personal Best</th>
-                    <th>Status</th>
-                    {isAdmin ? <th>Actions</th> : null}
+                    <th>Average difference</th>
+                    {isAdmin ? <th className="profileActionsColHead" aria-label="Actions" /> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {profileRuns.slice(0, 12).map((run, index) => {
                     const deltaMs = bestRun ? run.elapsedMs - bestRun.elapsedMs : 0
                     const isBest = bestRun ? timerScoreKey(run) === timerScoreKey(bestRun) : false
+                    const averageDiffMs = averageMs === null ? null : run.elapsedMs - averageMs
+                    const averageDiffClassName =
+                      averageDiffMs === null
+                        ? ''
+                        : averageDiffMs > 0
+                          ? 'profileAvgDiff profileAvgDiff--slower'
+                          : averageDiffMs < 0
+                            ? 'profileAvgDiff profileAvgDiff--faster'
+                            : 'profileAvgDiff'
                     const runKey = timerScoreKey(run)
                     const editing = editingRunKey === runKey
-                    const editingThisRow = editingTargetKey === runKey
                     return (
                       <tr key={runKey}>
                         <td>{index + 1}</td>
                         <td>{formatTimerElapsedMs(run.elapsedMs)}</td>
                         <td>{formatRunDate(run.createdAt)}</td>
                         <td>{isBest ? 'PB' : `+${formatTimerElapsedMs(deltaMs)}`}</td>
-                        <td>
-                          {run.pendingSync ? (
-                            <span className="profileStatusText">Pending upload</span>
-                          ) : (
-                            <span className="profileSyncDot" aria-label="Synced" title="Synced" />
-                          )}
+                        <td className={averageDiffClassName}>
+                          {averageDiffMs === null
+                            ? '--'
+                            : averageDiffMs === 0
+                              ? 'Even'
+                              : `${averageDiffMs > 0 ? '+' : '-'}${formatTimerElapsedMs(Math.abs(averageDiffMs))}`}
                         </td>
                         {isAdmin ? (
                           <td>
-                            {editingThisRow ? (
-                              <div className="profileTableEditControls">
-                                <input
-                                  type="number"
-                                  className="profileTableEditInput"
-                                  value={editingSeconds}
-                                  min={20}
-                                  step={0.01}
-                                  onChange={(event) => setEditingSeconds(event.target.value)}
-                                  disabled={editing}
-                                  aria-label="Edit attempt seconds"
+                            <button
+                              type="button"
+                              className="profileTableEditBtn profileTableEditBtn--icon"
+                              onClick={() => onStartEditRun(run)}
+                              disabled={editing}
+                              aria-label="Edit attempt"
+                              title="Edit"
+                            >
+                              <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  d="M4 20h4l10-10a2 2 0 1 0-4-4L4 16v4Z"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
                                 />
-                                <button
-                                  type="button"
-                                  className="profileTableEditBtn"
-                                  onClick={() => void onSaveEditRun(run)}
-                                  disabled={editing}
-                                >
-                                  {editing ? 'Saving...' : 'Save'}
-                                </button>
-                                <button
-                                  type="button"
-                                  className="profileTableEditBtn profileTableEditBtn--secondary"
-                                  onClick={onCancelEditRun}
-                                  disabled={editing}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                className="profileTableEditBtn"
-                                onClick={() => onStartEditRun(run)}
-                                disabled={editing}
-                              >
-                                Edit
-                              </button>
-                            )}
+                                <path d="m12 6 4 4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                              </svg>
+                            </button>
                           </td>
                         ) : null}
                       </tr>
@@ -591,6 +593,41 @@ export function ProfilePage() {
           </div>
         ) : null}
       </section>
+      {editingRun ? (
+        <div className="profileEditModalOverlay" role="dialog" aria-modal="true" aria-label="Edit attempt time">
+          <div className="profileEditModal">
+            <h3>Edit attempt time</h3>
+            <p className="muted">Use format MM:SS.CS (example 01:23.45).</p>
+            <input
+              type="text"
+              className="profileTableEditInput profileTableEditInput--modal"
+              value={editingSeconds}
+              placeholder="00:00.00"
+              onChange={(event) => setEditingSeconds(event.target.value)}
+              disabled={editingRunKey !== null}
+              aria-label="Edit attempt time in format MM:SS.CS"
+            />
+            <div className="profileEditModalActions">
+              <button
+                type="button"
+                className="profileTableEditBtn"
+                onClick={() => void onSaveEditRun()}
+                disabled={editingRunKey !== null}
+              >
+                {editingRunKey !== null ? 'Saving...' : 'Save'}
+              </button>
+              <button
+                type="button"
+                className="profileTableEditBtn profileTableEditBtn--secondary"
+                onClick={onCancelEditRun}
+                disabled={editingRunKey !== null}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   )
 }

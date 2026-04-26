@@ -15,7 +15,7 @@ type RoomIndex = Record<string, RoomState>
 type KillerPoolStatsIndex = Record<string, { wins: number; games: number }>
 
 type TimerScoreRow = {
-  id?: number
+  id: number
   profile_id: string
   username: string
   elapsed_ms: number
@@ -499,6 +499,7 @@ export async function deleteCurrentAccount() {
 
 function normalizeTimerScore(row: TimerScoreRow): TimerScore {
   return {
+    id: row.id,
     profileId: row.profile_id,
     username: row.username,
     elapsedMs: row.elapsed_ms,
@@ -570,7 +571,7 @@ export async function flushPendingTimerScores(): Promise<number> {
             elapsed_ms: score.elapsedMs,
             created_at: score.createdAt,
           })
-          .select('profile_id, username, elapsed_ms, created_at')
+          .select('id, profile_id, username, elapsed_ms, created_at')
           .maybeSingle()
 
         if (error || !data) continue
@@ -602,7 +603,7 @@ export async function getTimerScores(): Promise<TimerScore[]> {
 
   const { data, error } = await supabase
     .from(TIMER_SCORES_TABLE)
-    .select('profile_id, username, elapsed_ms, created_at')
+    .select('id, profile_id, username, elapsed_ms, created_at')
     .order('elapsed_ms', { ascending: true })
     .returns<TimerScoreRow[]>()
 
@@ -636,7 +637,7 @@ export async function addTimerScore(input: Omit<TimerScore, 'createdAt' | 'pendi
       elapsed_ms: input.elapsedMs,
       created_at: nextLocalScore.createdAt,
     })
-    .select('profile_id, username, elapsed_ms, created_at')
+    .select('id, profile_id, username, elapsed_ms, created_at')
     .maybeSingle()
 
   if (error || !data) {
@@ -672,11 +673,13 @@ export async function deleteTimerScore(input: Pick<TimerScore, 'profileId' | 'el
 }
 
 export async function updateTimerScoreElapsedMs(
-  input: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'> & { nextElapsedMs: number },
+  input: Pick<TimerScore, 'id' | 'profileId' | 'elapsedMs' | 'createdAt'> & { nextElapsedMs: number },
 ) {
   const local = getTimerScoresLocal()
   const nextLocal = local.map((score) => {
-    if (score.profileId === input.profileId && score.createdAt === input.createdAt) {
+    const isTargetById = input.id !== undefined && score.id === input.id
+    const isTargetByFallback = score.profileId === input.profileId && score.createdAt === input.createdAt
+    if (isTargetById || isTargetByFallback) {
       return { ...score, elapsedMs: input.nextElapsedMs }
     }
     return score
@@ -685,13 +688,11 @@ export async function updateTimerScoreElapsedMs(
 
   if (!supabase) return
 
-  const { data, error } = await supabase
-    .from(TIMER_SCORES_TABLE)
-    .update({ elapsed_ms: input.nextElapsedMs })
-    .eq('profile_id', input.profileId)
-    .eq('created_at', input.createdAt)
-    .select('profile_id')
-    .maybeSingle()
+  const query = supabase.from(TIMER_SCORES_TABLE).update({ elapsed_ms: input.nextElapsedMs })
+  const match = input.id !== undefined
+    ? query.eq('id', input.id)
+    : query.eq('profile_id', input.profileId).eq('created_at', input.createdAt)
+  const { data, error } = await match.select('id').maybeSingle()
   if (error) {
     throw new Error(formatSupabaseError('Could not update timer attempt.', error.message))
   }

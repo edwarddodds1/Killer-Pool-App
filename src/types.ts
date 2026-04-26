@@ -37,6 +37,8 @@ export interface RoomState {
 }
 
 export interface TimerScore {
+  /** Supabase row id when available (undefined for local pending entries). */
+  id?: number
   profileId: string
   username: string
   elapsedMs: number

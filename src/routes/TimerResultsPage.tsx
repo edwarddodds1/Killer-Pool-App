@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } fro
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
 import {
-  formatRecentRunDayMonth,
   formatTimerElapsedMs,
   timerScoreBelongsToProfile,
   timerScoreKey,
@@ -240,7 +239,7 @@ export function TimerResultsPage() {
     .slice()
     .sort((a, b) => a.elapsedMs - b.elapsedMs)
     .slice(0, 3)
-  const recent5Runs = userRuns.slice(0, 5)
+  const recent3Runs = userRuns.slice(0, 3)
 
   const onDeleteRun = async (score: TimerScore) => {
     if (!profile) return
@@ -302,6 +301,7 @@ export function TimerResultsPage() {
 
     try {
       await updateTimerScoreElapsedMs({
+        id: score.id,
         profileId: score.profileId,
         elapsedMs: score.elapsedMs,
         createdAt: score.createdAt,
@@ -402,7 +402,6 @@ export function TimerResultsPage() {
                           <span>#{index + 1}</span>
                           <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
                           <div className="timerRowActions">
-                            {isSelected ? <small>{formatDateLabel(score.createdAt)}</small> : null}
                             {isAdmin ? (
                               <TimerEditIconButton
                                 busy={editing}
@@ -438,8 +437,8 @@ export function TimerResultsPage() {
               <div className="timerPerformanceBlock">
                 <h3>Recent</h3>
                 <div className="timerList timerList--dense">
-                  {recent5Runs.length ? (
-                    recent5Runs.map((score, index) => {
+                  {recent3Runs.length ? (
+                    recent3Runs.map((score, index) => {
                       const runKey = timerScoreKey(score)
                       const isSelected = selectedRunKey === runKey
                       const deleting = deletingRunKey === runKey
@@ -450,14 +449,17 @@ export function TimerResultsPage() {
                           className={`timerRow timerRow--compact timerRow--recent timerRow--selectable ${isSelected ? 'timerRow--selected' : ''}`}
                           role="button"
                           tabIndex={0}
-                          onClick={() => setSelectedRunKey(runKey)}
+                          onClick={() => setSelectedRunKey((current) => (current === runKey ? null : runKey))}
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') setSelectedRunKey(runKey)
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              setSelectedRunKey((current) => (current === runKey ? null : runKey))
+                            }
                           }}
                         >
                           <span>#{index + 1}</span>
-                          <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
-                          <span className="timerRecentDate">{formatRecentRunDayMonth(score.createdAt)}</span>
+                          <strong className={isSelected ? 'timerRecentValue timerRecentValue--date' : 'timerRecentValue'}>
+                            {isSelected ? formatDateLabel(score.createdAt) : formatTimerElapsedMs(score.elapsedMs)}
+                          </strong>
                           <div className="timerRowActions">
                             {isAdmin ? (
                               <TimerEditIconButton

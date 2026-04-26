@@ -1202,13 +1202,15 @@ input, select, .btn {
 .timerResultsPanel h3 { margin: 0; font-size: 1rem; }
 .timerResultsSummary {
   display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 8px;
 }
 .timerSummaryRow {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 6px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1219,6 +1221,9 @@ input, select, .btn {
   font-weight: 700;
   font-size: 0.88rem;
 }
+.timerSummaryRow strong {
+  font-variant-numeric: tabular-nums;
+}
 .timerList--dense { gap: 6px; }
 .timerRow--compact {
   padding: 11px 13px;
@@ -1228,13 +1233,23 @@ input, select, .btn {
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
 .timerRow--recent {
-  grid-template-columns: auto auto auto minmax(40px, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 .timerRecentDate {
   font-size: 0.78rem;
   font-weight: 600;
   color: #5a6169;
   white-space: nowrap;
+}
+.timerRecentValue {
+  font-variant-numeric: tabular-nums;
+}
+.timerRecentValue--date {
+  font-size: 0.76rem;
+  color: #5a6169;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .timerRowActions {
   justify-self: end;
@@ -1303,6 +1318,7 @@ input, select, .btn {
 
 .timerPerformanceLists {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 8px;
 }
@@ -1383,6 +1399,7 @@ input, select, .btn {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  padding-bottom: 2px;
 }
 .profileNameRow .homeTimerRankBubble {
   margin-left: auto;
@@ -1391,12 +1408,13 @@ input, select, .btn {
 .profileCardHeader h2 {
   margin: 0;
   font-size: clamp(1.45rem, 5.1vw, 2rem);
-  line-height: 1.05;
+  line-height: 1.18;
 }
 .profileFormRating {
   display: inline-flex;
   align-items: center;
   gap: 3px;
+  margin-top: 6px;
 }
 .profileFormLabel {
   margin-right: 4px;
@@ -1657,6 +1675,15 @@ input, select, .btn {
   border: 1px solid #000;
   vertical-align: middle;
 }
+.profileAvgDiff {
+  font-weight: 700;
+}
+.profileAvgDiff--slower {
+  color: #b91c1c;
+}
+.profileAvgDiff--faster {
+  color: #15803d;
+}
 .profileTableEditBtn {
   border: 1px solid #b8c0cb;
   background: #fff;
@@ -1672,22 +1699,67 @@ input, select, .btn {
   opacity: 0.65;
   cursor: wait;
 }
+.profileTableEditBtn--icon {
+  min-height: 30px;
+  min-width: 34px;
+  width: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.profileTableEditBtn--icon svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
 .profileTableEditBtn--secondary {
   font-weight: 600;
 }
-.profileTableEditControls {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .profileTableEditInput {
-  width: 88px;
+  width: 96px;
   min-height: 30px;
   border: 1px solid #b8c0cb;
   border-radius: 8px;
   padding: 4px 8px;
   font-size: 0.76rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.profileTableEditInput--modal {
+  width: 100%;
+  min-height: 40px;
+  font-size: 0.95rem;
+}
+.profileActionsColHead {
+  width: 54px;
+}
+.profileEditModalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: grid;
+  place-items: center;
+  z-index: 1200;
+  padding: 16px;
+}
+.profileEditModal {
+  width: min(420px, 100%);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+.profileEditModal h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+.profileEditModalActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 .timerHomeBtn--small {
   border: 0;
