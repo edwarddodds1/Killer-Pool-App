@@ -1402,15 +1402,21 @@ input, select, .btn {
   margin-right: 4px;
   font-size: 0.76rem;
   font-weight: 700;
-  color: #3b4350;
+  color: #000;
   letter-spacing: 0.01em;
 }
 .profileFormStar {
   width: 14px;
   height: 14px;
   color: #c9d0da;
+  stroke: #000;
+  stroke-width: 1.8;
+  paint-order: stroke fill;
 }
-.profileFormStar--filled {
+.profileFormStarBase {
+  color: #c9d0da;
+}
+.profileFormStarFill {
   color: #f59e0b;
 }
 .profileBackBtn {
@@ -1665,6 +1671,23 @@ input, select, .btn {
 .profileTableEditBtn:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+.profileTableEditBtn--secondary {
+  font-weight: 600;
+}
+.profileTableEditControls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.profileTableEditInput {
+  width: 88px;
+  min-height: 30px;
+  border: 1px solid #b8c0cb;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
 }
 .timerHomeBtn--small {
   border: 0;

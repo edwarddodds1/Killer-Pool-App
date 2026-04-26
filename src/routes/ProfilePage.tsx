@@ -35,6 +35,10 @@ function clamp01(value: number) {
   return Math.max(0, Math.min(1, value))
 }
 
+function clamp05To5(value: number) {
+  return Math.max(0.5, Math.min(5, value))
+}
+
 export function ProfilePage() {
   const navigate = useNavigate()
   const { profileId } = useParams<{ profileId?: string }>()
@@ -43,6 +47,8 @@ export function ProfilePage() {
   const [scores, setScores] = useState<TimerScore[]>([])
   const [error, setError] = useState('')
   const [editingRunKey, setEditingRunKey] = useState<string | null>(null)
+  const [editingTargetKey, setEditingTargetKey] = useState<string | null>(null)
+  const [editingSeconds, setEditingSeconds] = useState('')
   const requestedUsername = (searchParams.get('username') ?? '').trim()
   const isAdmin = useMemo(() => {
     if (!profile) return false
@@ -171,7 +177,9 @@ export function ProfilePage() {
     const now = new Date()
     const startOfWeek = new Date(now)
     startOfWeek.setHours(0, 0, 0, 0)
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+    // Monday-start week (Mon-Sun)
+    const daysSinceMonday = (startOfWeek.getDay() + 6) % 7
+    startOfWeek.setDate(startOfWeek.getDate() - daysSinceMonday)
     const endOfWeek = new Date(startOfWeek)
     endOfWeek.setDate(endOfWeek.getDate() + 7)
 
@@ -219,7 +227,7 @@ export function ProfilePage() {
     return fasterPlayers + 1
   }, [bestRun, scores])
 
-  const formStars = useMemo(() => {
+  const formRating = useMemo(() => {
     if (!bestRun || averageMs === null || fiveGameAverageMs === null) return 0
     const pbMs = bestRun.elapsedMs
     const recentImprovement = averageMs > 0 ? (averageMs - fiveGameAverageMs) / averageMs : 0
@@ -232,7 +240,8 @@ export function ProfilePage() {
       pbClosenessComponent * 0.25 +
       consistencyComponent * 0.15 +
       rankingComponent * 0.25
-    return Math.max(1, Math.min(5, Math.round(weightedScore * 5)))
+    const outOfFive = clamp05To5(weightedScore * 5)
+    return Math.round(outOfFive * 2) / 2
   }, [averageMs, bestRun, fiveGameAverageMs, personalRank])
 
   const onDeleteAccount = async () => {
@@ -247,14 +256,22 @@ export function ProfilePage() {
     }
   }
 
-  const onEditRunTime = async (run: TimerScore) => {
+  const onStartEditRun = (run: TimerScore) => {
+    if (!isAdmin) return
+    setError('')
+    setEditingTargetKey(timerScoreKey(run))
+    setEditingSeconds((run.elapsedMs / 1000).toFixed(2))
+  }
+
+  const onCancelEditRun = () => {
+    setEditingTargetKey(null)
+    setEditingSeconds('')
+  }
+
+  const onSaveEditRun = async (run: TimerScore) => {
     if (!isAdmin) return
 
-    const initialSeconds = (run.elapsedMs / 1000).toFixed(2)
-    const input = window.prompt('Enter new time in seconds (minimum 20.00):', initialSeconds)
-    if (input === null) return
-
-    const nextSeconds = Number(input.trim())
+    const nextSeconds = Number(editingSeconds.trim())
     if (!Number.isFinite(nextSeconds)) {
       setError('Please enter a valid number of seconds.')
       return
@@ -283,6 +300,8 @@ export function ProfilePage() {
         createdAt: run.createdAt,
         nextElapsedMs,
       })
+      setEditingTargetKey(null)
+      setEditingSeconds('')
     } catch {
       setScores(previous)
       setError('Could not edit that attempt. Please try again.')
@@ -329,18 +348,35 @@ export function ProfilePage() {
                 </div>
               ) : null}
             </div>
-            <div className="profileFormRating" aria-label={`Form rating ${formStars} out of 5`}>
+            <div className="profileFormRating" aria-label={`Form rating ${formRating} out of 5`}>
               <span className="profileFormLabel">Form</span>
               {Array.from({ length: 5 }, (_, index) => (
                 <svg
                   key={index}
                   viewBox="0 0 24 24"
-                  className={`profileFormStar ${index < formStars ? 'profileFormStar--filled' : ''}`}
+                  className="profileFormStar"
                   aria-hidden="true"
                 >
+                  <defs>
+                    <clipPath id={`profile-form-star-fill-${index}`}>
+                      <rect
+                        x="0"
+                        y="0"
+                        width={`${Math.max(0, Math.min(1, formRating - index)) * 24}`}
+                        height="24"
+                      />
+                    </clipPath>
+                  </defs>
                   <path
+                    className="profileFormStarBase"
                     d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
                     fill="currentColor"
+                  />
+                  <path
+                    className="profileFormStarFill"
+                    d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
+                    fill="currentColor"
+                    clipPath={`url(#profile-form-star-fill-${index})`}
                   />
                 </svg>
               ))}
@@ -478,9 +514,11 @@ export function ProfilePage() {
                   {profileRuns.slice(0, 12).map((run, index) => {
                     const deltaMs = bestRun ? run.elapsedMs - bestRun.elapsedMs : 0
                     const isBest = bestRun ? timerScoreKey(run) === timerScoreKey(bestRun) : false
-                    const editing = editingRunKey === timerScoreKey(run)
+                    const runKey = timerScoreKey(run)
+                    const editing = editingRunKey === runKey
+                    const editingThisRow = editingTargetKey === runKey
                     return (
-                      <tr key={timerScoreKey(run)}>
+                      <tr key={runKey}>
                         <td>{index + 1}</td>
                         <td>{formatTimerElapsedMs(run.elapsedMs)}</td>
                         <td>{formatRunDate(run.createdAt)}</td>
@@ -494,14 +532,45 @@ export function ProfilePage() {
                         </td>
                         {isAdmin ? (
                           <td>
-                            <button
-                              type="button"
-                              className="profileTableEditBtn"
-                              onClick={() => void onEditRunTime(run)}
-                              disabled={editing}
-                            >
-                              {editing ? 'Saving...' : 'Edit'}
-                            </button>
+                            {editingThisRow ? (
+                              <div className="profileTableEditControls">
+                                <input
+                                  type="number"
+                                  className="profileTableEditInput"
+                                  value={editingSeconds}
+                                  min={20}
+                                  step={0.01}
+                                  onChange={(event) => setEditingSeconds(event.target.value)}
+                                  disabled={editing}
+                                  aria-label="Edit attempt seconds"
+                                />
+                                <button
+                                  type="button"
+                                  className="profileTableEditBtn"
+                                  onClick={() => void onSaveEditRun(run)}
+                                  disabled={editing}
+                                >
+                                  {editing ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="profileTableEditBtn profileTableEditBtn--secondary"
+                                  onClick={onCancelEditRun}
+                                  disabled={editing}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="profileTableEditBtn"
+                                onClick={() => onStartEditRun(run)}
+                                disabled={editing}
+                              >
+                                Edit
+                              </button>
+                            )}
                           </td>
                         ) : null}
                       </tr>
