@@ -11,12 +11,10 @@ import {
   flushPendingTimerScores,
   getProfile,
   getTimerScores,
-  updateTimerScoreElapsedMs,
 } from '../utils/store'
 import { isSupabaseEnabled } from '../lib/supabase'
 
 const ADMIN_USERNAMES = new Set(['edwarddodds1'])
-const MIN_VALID_TIMER_RUN_MS = 20_000
 const LEADERBOARD_FRESH_WINDOW_MS = 48 * 60 * 60 * 1000
 
 function formatDateLabel(iso: string) {
@@ -89,53 +87,6 @@ function TimerDeleteIconButton({
   )
 }
 
-function TimerEditIconButton({
-  disabled,
-  busy,
-  onClick,
-  onKeyDown,
-}: {
-  disabled?: boolean
-  busy?: boolean
-  onClick: (e: MouseEvent) => void
-  onKeyDown?: (e: KeyboardEvent) => void
-}) {
-  return (
-    <button
-      type="button"
-      className="timerDeleteBtn timerDeleteBtn--icon"
-      disabled={disabled || busy}
-      aria-label={busy ? 'Saving' : 'Edit attempt time'}
-      title="Edit time"
-      onClick={onClick}
-      onKeyDown={onKeyDown}
-    >
-      {busy ? (
-        <span className="timerDeleteBtn__busy" aria-hidden>
-          …
-        </span>
-      ) : (
-        <svg
-          className="timerDeleteIcon"
-          viewBox="0 0 24 24"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden
-        >
-          <path
-            d="M4 20h4l10-10a2 2 0 1 0-4-4L4 16v4Z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <path d="m12 6 4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      )}
-    </button>
-  )
-}
-
 export function TimerResultsPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -144,7 +95,6 @@ export function TimerResultsPage() {
   const [selectedRunKey, setSelectedRunKey] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [deletingRunKey, setDeletingRunKey] = useState<string | null>(null)
-  const [editingRunKey, setEditingRunKey] = useState<string | null>(null)
 
   const invalidRun = searchParams.get('invalid') === '1'
 
@@ -270,51 +220,6 @@ export function TimerResultsPage() {
     }
   }
 
-  const onEditRunTime = async (score: TimerScore) => {
-    if (!isAdmin) return
-
-    const initialSeconds = (score.elapsedMs / 1000).toFixed(2)
-    const input = window.prompt('Enter new time in seconds (minimum 20.00):', initialSeconds)
-    if (input === null) return
-
-    const nextSeconds = Number(input.trim())
-    if (!Number.isFinite(nextSeconds)) {
-      setError('Please enter a valid number of seconds.')
-      return
-    }
-
-    const nextElapsedMs = Math.round(nextSeconds * 1000)
-    if (nextElapsedMs < MIN_VALID_TIMER_RUN_MS) {
-      setError('Edited time must be at least 20.00 seconds.')
-      return
-    }
-
-    const runKey = timerScoreKey(score)
-    setError('')
-    setEditingRunKey(runKey)
-    const previous = scores
-    setScores((prev) =>
-      prev
-        .map((run) => (timerScoreKey(run) === runKey ? { ...run, elapsedMs: nextElapsedMs } : run))
-        .sort((a, b) => a.elapsedMs - b.elapsedMs),
-    )
-
-    try {
-      await updateTimerScoreElapsedMs({
-        id: score.id,
-        profileId: score.profileId,
-        elapsedMs: score.elapsedMs,
-        createdAt: score.createdAt,
-        nextElapsedMs,
-      })
-    } catch {
-      setScores(previous)
-      setError('Could not edit that attempt. Please try again.')
-    } finally {
-      setEditingRunKey(null)
-    }
-  }
-
   const openPlayerProfile = (score: Pick<TimerScore, 'profileId' | 'username'>) => {
     const username = score.username.trim()
     const suffix = username ? `?username=${encodeURIComponent(username)}` : ''
@@ -387,7 +292,6 @@ export function TimerResultsPage() {
                       const runKey = timerScoreKey(score)
                       const isSelected = selectedRunKey === runKey
                       const deleting = deletingRunKey === runKey
-                      const editing = editingRunKey === runKey
                       return (
                         <div
                           key={runKey}
@@ -402,18 +306,6 @@ export function TimerResultsPage() {
                           <span>#{index + 1}</span>
                           <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
                           <div className="timerRowActions">
-                            {isAdmin ? (
-                              <TimerEditIconButton
-                                busy={editing}
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  void onEditRunTime(score)
-                                }}
-                                onKeyDown={(event) => {
-                                  event.stopPropagation()
-                                }}
-                              />
-                            ) : null}
                             <TimerDeleteIconButton
                               busy={deleting}
                               onClick={(event) => {
@@ -442,7 +334,6 @@ export function TimerResultsPage() {
                       const runKey = timerScoreKey(score)
                       const isSelected = selectedRunKey === runKey
                       const deleting = deletingRunKey === runKey
-                      const editing = editingRunKey === runKey
                       return (
                         <div
                           key={runKey}
@@ -461,18 +352,6 @@ export function TimerResultsPage() {
                             {isSelected ? formatDateLabel(score.createdAt) : formatTimerElapsedMs(score.elapsedMs)}
                           </strong>
                           <div className="timerRowActions">
-                            {isAdmin ? (
-                              <TimerEditIconButton
-                                busy={editing}
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  void onEditRunTime(score)
-                                }}
-                                onKeyDown={(event) => {
-                                  event.stopPropagation()
-                                }}
-                              />
-                            ) : null}
                             <TimerDeleteIconButton
                               busy={deleting}
                               onClick={(event) => {
@@ -502,7 +381,6 @@ export function TimerResultsPage() {
                 leaderboard.map((score, index) => {
                   const runKey = timerScoreKey(score)
                   const deleting = deletingRunKey === runKey
-                  const editing = editingRunKey === runKey
                   const isFresh = isLeaderboardRecent(score.createdAt)
                   return (
                     <div
@@ -521,28 +399,16 @@ export function TimerResultsPage() {
                         {isFresh ? <span className="timerFreshBadge">NEW</span> : null}
                         <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
                         {isAdmin ? (
-                          <>
-                            <TimerEditIconButton
-                              busy={editing}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                void onEditRunTime(score)
-                              }}
-                              onKeyDown={(event) => {
-                                event.stopPropagation()
-                              }}
-                            />
-                            <TimerDeleteIconButton
-                              busy={deleting}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                void onDeleteRun(score)
-                              }}
-                              onKeyDown={(event) => {
-                                event.stopPropagation()
-                              }}
-                            />
-                          </>
+                          <TimerDeleteIconButton
+                            busy={deleting}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              void onDeleteRun(score)
+                            }}
+                            onKeyDown={(event) => {
+                              event.stopPropagation()
+                            }}
+                          />
                         ) : null}
                       </div>
                     </div>

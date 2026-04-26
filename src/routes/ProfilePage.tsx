@@ -515,16 +515,15 @@ export function ProfilePage() {
               <table className="profileTable">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Time</th>
-                    <th>Date</th>
-                    <th>Personal Best</th>
-                    <th>Average difference</th>
+                    <th className="profileTableColTime">Time</th>
+                    <th className="profileTableColDate">Date</th>
+                    <th className="profileTableColPb">Personal Best</th>
+                    <th className="profileTableColAvgDiff">Average difference</th>
                     {isAdmin ? <th className="profileActionsColHead" aria-label="Actions" /> : null}
                   </tr>
                 </thead>
                 <tbody>
-                  {profileRuns.slice(0, 12).map((run, index) => {
+                  {profileRuns.slice(0, 12).map((run) => {
                     const deltaMs = bestRun ? run.elapsedMs - bestRun.elapsedMs : 0
                     const isBest = bestRun ? timerScoreKey(run) === timerScoreKey(bestRun) : false
                     const averageDiffMs = averageMs === null ? null : run.elapsedMs - averageMs
@@ -540,11 +539,10 @@ export function ProfilePage() {
                     const editing = editingRunKey === runKey
                     return (
                       <tr key={runKey}>
-                        <td>{index + 1}</td>
-                        <td>{formatTimerElapsedMs(run.elapsedMs)}</td>
-                        <td>{formatRunDate(run.createdAt)}</td>
-                        <td>{isBest ? 'PB' : `+${formatTimerElapsedMs(deltaMs)}`}</td>
-                        <td className={averageDiffClassName}>
+                        <td className="profileTableColTime">{formatTimerElapsedMs(run.elapsedMs)}</td>
+                        <td className="profileTableColDate">{formatRunDate(run.createdAt)}</td>
+                        <td className="profileTableColPb">{isBest ? 'PB' : `+${formatTimerElapsedMs(deltaMs)}`}</td>
+                        <td className={`profileTableColAvgDiff ${averageDiffClassName}`.trim()}>
                           {averageDiffMs === null
                             ? '--'
                             : averageDiffMs === 0

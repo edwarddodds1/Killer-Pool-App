@@ -22,7 +22,10 @@ const REMOTE_SYNC_MS = 1800
 const PREP_SPIN_MS = 520
 const MAX_PLAYERS = 8
 const BOT_NAMES = ['CueBot', 'RackBot', 'SpinBot', 'GhostCue', 'PocketPro', 'RailRunner', 'BankShot', 'SidePocket']
+const BOT_AVATAR_ICON = '🤖'
 const SHUFFLE_TUNING_KEY = 'killer_pool_shuffle_tuning_v1'
+const READY_PENDING_MATCH_HOLD_MS = 550
+const READY_PENDING_MAX_MS = 3000
 
 type OrderAnimPhase =
   | 'lineup'
@@ -50,6 +53,43 @@ function randomIndex(maxExclusive: number) {
   const arr = new Uint32Array(1)
   crypto.getRandomValues(arr)
   return arr[0] % maxExclusive
+}
+
+function sortBallsAsc(balls: number[]) {
+  return [...balls].sort((a, b) => a - b)
+}
+
+function roomSyncRevision(room: RoomState | null | undefined) {
+  return room?.syncRevision ?? 0
+}
+
+function roomSyncUpdatedAtMs(room: RoomState | null | undefined) {
+  if (!room?.syncUpdatedAt) return 0
+  const parsed = Date.parse(room.syncUpdatedAt)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
+function stampRoomForWrite(next: RoomState, current: RoomState | null | undefined): RoomState {
+  const nowIso = new Date().toISOString()
+  const baseRevision = Math.max(roomSyncRevision(current), roomSyncRevision(next))
+  return {
+    ...next,
+    syncRevision: baseRevision + 1,
+    syncUpdatedAt: nowIso,
+  }
+}
+
+function shouldAcceptIncomingRoom(incoming: RoomState, current: RoomState | null | undefined) {
+  if (!current) return true
+  const incomingHasSyncMeta = incoming.syncRevision !== undefined || incoming.syncUpdatedAt !== undefined
+  const currentHasSyncMeta = current.syncRevision !== undefined || current.syncUpdatedAt !== undefined
+  // Backward compatibility: allow updates from clients/tabs that haven't adopted sync metadata yet.
+  if (!incomingHasSyncMeta || !currentHasSyncMeta) return true
+  const incomingRevision = roomSyncRevision(incoming)
+  const currentRevision = roomSyncRevision(current)
+  if (incomingRevision > currentRevision) return true
+  if (incomingRevision < currentRevision) return false
+  return roomSyncUpdatedAtMs(incoming) >= roomSyncUpdatedAtMs(current)
 }
 
 function findNextTurn(room: RoomState, from: number) {
@@ -119,6 +159,7 @@ export function RoomPage() {
   const [localOrderRunId, setLocalOrderRunId] = useState(0)
   const [inviteCopied, setInviteCopied] = useState(false)
   const [showHeaderBalls, setShowHeaderBalls] = useState(false)
+  const [pendingReadyState, setPendingReadyState] = useState<{ value: boolean; setAt: number } | null>(null)
   const orderTimeoutsRef = useRef<number[]>([])
   const orderIntervalRef = useRef<number | null>(null)
   const orderAnimKeyRef = useRef('')
@@ -137,6 +178,7 @@ export function RoomPage() {
     const syncFromRemote = async () => {
       const latest = await getRoomRemote(code)
       if (!latest) return
+      if (!shouldAcceptIncomingRoom(latest, roomRef.current)) return
       const nextSnapshot = JSON.stringify(latest)
       if (nextSnapshot === roomSnapshotRef.current) return
       roomSnapshotRef.current = nextSnapshot
@@ -147,6 +189,7 @@ export function RoomPage() {
 
     void syncFromRemote()
     const unsubscribe = subscribeRoomRemote(code, (latest) => {
+      if (!shouldAcceptIncomingRoom(latest, roomRef.current)) return
       const nextSnapshot = JSON.stringify(latest)
       if (nextSnapshot === roomSnapshotRef.current) return
       roomSnapshotRef.current = nextSnapshot
@@ -158,6 +201,7 @@ export function RoomPage() {
     const ticker = setInterval(() => {
       const latest = getRoom(code)
       if (!latest) return
+      if (!shouldAcceptIncomingRoom(latest, roomRef.current)) return
       const nextSnapshot = JSON.stringify(latest)
       if (nextSnapshot === roomSnapshotRef.current) return
       roomSnapshotRef.current = nextSnapshot
@@ -172,6 +216,7 @@ export function RoomPage() {
       void getRoomRemote(code)
         .then((latest) => {
           if (!latest) return
+          if (!shouldAcceptIncomingRoom(latest, roomRef.current)) return
           const nextSnapshot = JSON.stringify(latest)
           if (nextSnapshot === roomSnapshotRef.current) return
           roomSnapshotRef.current = nextSnapshot
@@ -207,7 +252,11 @@ export function RoomPage() {
   )
 
   const me = useMemo(() => room?.players.find((player) => player.id === profile?.id), [profile?.id, room])
-  const allReady = room ? room.players.length > 1 && room.players.every((player) => player.ready) : false
+  const meEffectiveReady = pendingReadyState?.value ?? me?.ready ?? false
+  const allReady = room
+    ? room.players.length > 1 &&
+      room.players.every((player) => (player.id === me?.id ? meEffectiveReady : player.ready))
+    : false
   const currentTurnPlayer = room ? activePlayer(room) : undefined
   const botsCount = room ? room.players.filter((player) => player.isBot).length : 0
   const playOrderKey = room ? room.playOrder.join(',') : ''
@@ -219,7 +268,7 @@ export function RoomPage() {
     : false
   const takenIcons = new Set(
     (room?.players ?? [])
-      .filter((player) => player.id !== me?.id)
+      .filter((player) => player.id !== me?.id && !player.isBot)
       .map((player) => player.avatarIcon)
       .filter((icon): icon is string => Boolean(icon)),
   )
@@ -248,12 +297,29 @@ export function RoomPage() {
     }
   }, [me, room])
 
+  useEffect(() => {
+    if (!me) {
+      setPendingReadyState(null)
+      return
+    }
+    if (pendingReadyState === null) return
+    const elapsed = Date.now() - pendingReadyState.setAt
+    if (me.ready === pendingReadyState.value && elapsed >= READY_PENDING_MATCH_HOLD_MS) {
+      setPendingReadyState(null)
+      return
+    }
+    if (elapsed >= READY_PENDING_MAX_MS) {
+      setPendingReadyState(null)
+    }
+  }, [me, pendingReadyState])
+
   const saveRoom = (next: RoomState, oldCode?: string) => {
-    roomSnapshotRef.current = JSON.stringify(next)
-    roomRef.current = next
-    setRoom(next)
-    upsertRoom(next, oldCode)
-    void upsertRoomRemote(next, oldCode)
+    const stamped = stampRoomForWrite(next, roomRef.current)
+    roomSnapshotRef.current = JSON.stringify(stamped)
+    roomRef.current = stamped
+    setRoom(stamped)
+    upsertRoom(stamped, oldCode)
+    void upsertRoomRemote(stamped, oldCode)
   }
 
   const pushUndoSnapshot = (snapshot: RoomState) => {
@@ -421,10 +487,12 @@ export function RoomPage() {
 
   const toggleReady = () => {
     if (isLateJoinLocked) return
+    const nextReady = !meEffectiveReady
+    setPendingReadyState({ value: nextReady, setAt: Date.now() })
     applyRoomUpdate((current) => ({
       ...current,
       players: current.players.map((player) =>
-        player.id === me.id ? { ...player, ready: !player.ready } : player,
+        player.id === me.id ? { ...player, ready: nextReady } : player,
       ),
     })
     )
@@ -440,12 +508,12 @@ export function RoomPage() {
     const allocation = allocateBalls(latest.players, latest.mode, latest.killerAllocationMode)
     const nextPlayers = latest.players.map((player) => ({
       ...player,
-      assignedBalls: allocation.get(player.id) ?? [],
+      assignedBalls: sortBallsAsc(allocation.get(player.id) ?? []),
     }))
     const tempSpinner = setInterval(() => setAllocationPreview(Math.floor(Math.random() * 15) + 1), 90)
     setTimeout(() => {
       clearInterval(tempSpinner)
-      setAllocationPreview((allocation.get(latestMe.id) ?? [1])[0])
+      setAllocationPreview(sortBallsAsc(allocation.get(latestMe.id) ?? [1])[0])
       applyRoomUpdate((current) => {
         const stillAllReady = current.players.length > 1 && current.players.every((player) => player.ready)
         if (!stillAllReady || current.status !== 'lobby') return null
@@ -620,11 +688,6 @@ export function RoomPage() {
     const openSpots = MAX_PLAYERS - room.players.length
     if (openSpots <= 0) return
     const usedNames = new Set(room.players.map((player) => player.username))
-    const usedIcons = new Set(
-      room.players
-        .map((player) => player.avatarIcon)
-        .filter((icon): icon is string => Boolean(icon)),
-    )
     const nextPlayers = [...room.players]
     const baseName = BOT_NAMES[randomIndex(BOT_NAMES.length)]
     let candidateName = baseName
@@ -634,14 +697,10 @@ export function RoomPage() {
       suffix += 1
     }
     usedNames.add(candidateName)
-    const availableIcons = AVATAR_ICONS.filter((icon) => !usedIcons.has(icon))
-    if (!availableIcons.length) return
-    const icon = availableIcons[randomIndex(availableIcons.length)]
-    usedIcons.add(icon)
     nextPlayers.push({
       id: `bot-${crypto.randomUUID()}`,
       username: candidateName,
-      avatarIcon: icon,
+      avatarIcon: BOT_AVATAR_ICON,
       isBot: true,
       ready: true,
       assignedBalls: [],
@@ -669,11 +728,17 @@ export function RoomPage() {
     const survivors = room.players.filter((player) => !player.eliminated)
     return [...survivors, ...eliminatedReverse]
   })()
+  const showPreGameModeLabel = room.status === 'lobby' || room.status === 'allocation' || room.status === 'order'
+  const modeAllocationLabel = room.killerAllocationMode === 'multi' ? 'Multi ball' : 'Single ball'
 
   useEffect(() => {
     if (!room || room.mode !== 'killer' || room.status !== 'results') return
     const gameKey = `${room.code}:${room.gameNumber}`
     if (recordedResultKeysRef.current.has(gameKey)) return
+    if (room.players.some((player) => player.isBot)) {
+      recordedResultKeysRef.current.add(gameKey)
+      return
+    }
 
     const winnerId = resultsOrder[0]?.id
     for (const player of room.players) {
@@ -721,6 +786,7 @@ export function RoomPage() {
           <div>
             <strong>{me.username}</strong>
             {room.status === 'lobby' ? <p>Code: {room.code}</p> : null}
+            {showPreGameModeLabel ? <p className="headerMetaLabel">{modeAllocationLabel}</p> : null}
           </div>
         </div>
         {me.assignedBalls.length > 0 ? (
@@ -749,7 +815,7 @@ export function RoomPage() {
               </button>
               <div className={`headerBallTray ${showHeaderBalls ? 'headerBallTray--open' : ''}`} aria-hidden={!showHeaderBalls}>
                 <div className="headerBallIndicator">
-                  {me.assignedBalls.map((ball) => (
+                  {sortBallsAsc(me.assignedBalls).map((ball) => (
                     <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
                   ))}
                 </div>
@@ -757,7 +823,7 @@ export function RoomPage() {
             </div>
           ) : (
             <div className="headerBallIndicator">
-              {me.assignedBalls.map((ball) => (
+              {sortBallsAsc(me.assignedBalls).map((ball) => (
                 <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
               ))}
             </div>
@@ -801,9 +867,6 @@ export function RoomPage() {
               ))}
             </div>
           </div>
-          <p className="muted">
-            {room.mode === 'killer' ? 'Killer Pool' : 'Kelly Pool'} · {room.killerAllocationMode} ball allocation
-          </p>
           <div className="playerList">
             {room.players.map((player) => (
               <div key={player.id} className="playerRow">
@@ -814,15 +877,17 @@ export function RoomPage() {
                     {player.isBot ? ' (BOT)' : ''}
                   </span>
                 </div>
-                <span className={player.ready ? 'ready ready--yes' : 'ready'}>
-                  {player.ready ? 'Ready' : 'Waiting'}
+                <span
+                  className={(player.id === me.id ? meEffectiveReady : player.ready) ? 'ready ready--yes' : 'ready'}
+                >
+                  {(player.id === me.id ? meEffectiveReady : player.ready) ? 'Ready' : 'Waiting'}
                 </span>
               </div>
             ))}
           </div>
           <div className="stack">
             <button className="btn btn--ready" onClick={toggleReady} disabled={isLateJoinLocked}>
-              {me.ready ? 'Unready' : 'Ready'}
+              {meEffectiveReady ? 'Unready' : 'Ready'}
             </button>
             <button className="btn btn--primary" onClick={startAllocation} disabled={isLateJoinLocked || !allReady}>
               Start Ball Allocation
@@ -978,7 +1043,7 @@ export function RoomPage() {
                   </div>
                   <div className={`playerMiniAssigned ${room.mode === 'killer' ? 'playerMiniAssigned--hidden' : ''}`}>
                     {room.mode !== 'killer'
-                      ? player.assignedBalls.map((ball) => (
+                      ? sortBallsAsc(player.assignedBalls).map((ball) => (
                           <BallIcon
                             key={`assigned-${player.id}-${ball}`}
                             ball={ball}
@@ -1002,7 +1067,7 @@ export function RoomPage() {
 
       {room.status === 'results' ? (
         <section className="card card--pool">
-          <h2>Results</h2>
+          <h2 className="resultsTitle">Results</h2>
           <div className="stack resultsList">
             <div className="playerRow resultsHeaderRow" aria-hidden="true">
               <span />

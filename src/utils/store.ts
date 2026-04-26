@@ -9,7 +9,7 @@ const ROOMS_KEY = 'killer_pool_rooms_v1'
 const PROFILE_KEY = 'killer_pool_profile_v1'
 const TIMER_SCORES_KEY = 'killer_pool_timer_scores_v1'
 const ACCOUNTS_KEY = 'killer_pool_accounts_v1'
-const KILLER_POOL_STATS_KEY = 'killer_pool_killer_stats_v1'
+const KILLER_POOL_STATS_KEY = 'killer_pool_killer_stats_v2'
 
 type RoomIndex = Record<string, RoomState>
 type KillerPoolStatsIndex = Record<string, { wins: number; games: number }>
