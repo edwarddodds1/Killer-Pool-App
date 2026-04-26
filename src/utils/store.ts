@@ -689,12 +689,15 @@ export async function updateTimerScoreElapsedMs(
 
   if (!supabase) return
 
-  await supabase
+  const { error } = await supabase
     .from(TIMER_SCORES_TABLE)
     .update({ elapsed_ms: input.nextElapsedMs })
     .eq('profile_id', input.profileId)
     .eq('elapsed_ms', input.elapsedMs)
     .eq('created_at', input.createdAt)
+  if (error) {
+    throw new Error(formatSupabaseError('Could not update timer attempt.', error.message))
+  }
 }
 
 export function subscribeRoomRemote(

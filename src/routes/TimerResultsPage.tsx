@@ -18,10 +18,17 @@ import { isSupabaseEnabled } from '../lib/supabase'
 
 const ADMIN_USERNAMES = new Set(['edwarddodds1'])
 const MIN_VALID_TIMER_RUN_MS = 20_000
+const LEADERBOARD_FRESH_WINDOW_MS = 48 * 60 * 60 * 1000
 
 function formatDateLabel(iso: string) {
   const date = new Date(iso)
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+}
+
+function isLeaderboardRecent(iso: string) {
+  const createdMs = new Date(iso).getTime()
+  if (!Number.isFinite(createdMs)) return false
+  return Date.now() - createdMs <= LEADERBOARD_FRESH_WINDOW_MS
 }
 
 function TimerDeleteIconButton({
@@ -494,6 +501,7 @@ export function TimerResultsPage() {
                   const runKey = timerScoreKey(score)
                   const deleting = deletingRunKey === runKey
                   const editing = editingRunKey === runKey
+                  const isFresh = isLeaderboardRecent(score.createdAt)
                   return (
                     <div
                       key={runKey}
@@ -508,6 +516,7 @@ export function TimerResultsPage() {
                       <span>#{index + 1}</span>
                       <span className="timerRowUser">{score.username}</span>
                       <div className="timerRowActions">
+                        {isFresh ? <span className="timerFreshBadge">NEW</span> : null}
                         <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
                         {isAdmin ? (
                           <>

@@ -1242,6 +1242,21 @@ input, select, .btn {
   align-items: center;
   gap: 10px;
 }
+.timerFreshBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 22px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid #15803d;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
 .timerDeleteBtn {
   border: 1px solid var(--border);
   background: #fff;
@@ -1359,11 +1374,19 @@ input, select, .btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   width: 100%;
+  min-width: 0;
+}
+.profileNameRow h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .profileNameRow .homeTimerRankBubble {
   margin-left: auto;
+  flex-shrink: 0;
 }
 .profileCardHeader h2 {
   margin: 0;
@@ -1627,6 +1650,21 @@ input, select, .btn {
   background: #22c55e;
   border: 1px solid #000;
   vertical-align: middle;
+}
+.profileTableEditBtn {
+  border: 1px solid #b8c0cb;
+  background: #fff;
+  color: #253041;
+  border-radius: 8px;
+  min-height: 30px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.profileTableEditBtn:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 .timerHomeBtn--small {
   border: 0;

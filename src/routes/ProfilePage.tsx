@@ -2,7 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
 import { formatTimerElapsedMs, timerScoreBelongsToProfile, timerScoreKey } from '../../shared/timerLeaderboard'
-import { deleteCurrentAccount, flushPendingTimerScores, getKillerPoolStats, getProfile, getTimerScores } from '../utils/store'
+import {
+  deleteCurrentAccount,
+  flushPendingTimerScores,
+  getKillerPoolStats,
+  getProfile,
+  getTimerScores,
+  updateTimerScoreElapsedMs,
+} from '../utils/store'
+
+const ADMIN_USERNAMES = new Set(['edwarddodds1'])
+const MIN_VALID_TIMER_RUN_MS = 20_000
 
 function formatRunDate(iso: string) {
   const date = new Date(iso)
@@ -32,7 +42,12 @@ export function ProfilePage() {
   const profile = getProfile()
   const [scores, setScores] = useState<TimerScore[]>([])
   const [error, setError] = useState('')
+  const [editingRunKey, setEditingRunKey] = useState<string | null>(null)
   const requestedUsername = (searchParams.get('username') ?? '').trim()
+  const isAdmin = useMemo(() => {
+    if (!profile) return false
+    return ADMIN_USERNAMES.has(profile.username.trim().toLowerCase())
+  }, [profile])
 
   useEffect(() => {
     if (!profile) {
@@ -153,9 +168,18 @@ export function ProfilePage() {
   }, [progressRuns])
 
   const weekdayAverages = useMemo(() => {
+    const now = new Date()
+    const startOfWeek = new Date(now)
+    startOfWeek.setHours(0, 0, 0, 0)
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay())
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(endOfWeek.getDate() + 7)
+
     const byDay = new Map<number, { total: number; runs: number }>()
     for (const run of profileRuns) {
-      const day = new Date(run.createdAt).getDay()
+      const runDate = new Date(run.createdAt)
+      if (runDate < startOfWeek || runDate >= endOfWeek) continue
+      const day = runDate.getDay()
       const current = byDay.get(day)
       if (current) {
         current.total += run.elapsedMs
@@ -220,6 +244,50 @@ export function ProfilePage() {
       navigate('/', { replace: true })
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Could not delete account.')
+    }
+  }
+
+  const onEditRunTime = async (run: TimerScore) => {
+    if (!isAdmin) return
+
+    const initialSeconds = (run.elapsedMs / 1000).toFixed(2)
+    const input = window.prompt('Enter new time in seconds (minimum 20.00):', initialSeconds)
+    if (input === null) return
+
+    const nextSeconds = Number(input.trim())
+    if (!Number.isFinite(nextSeconds)) {
+      setError('Please enter a valid number of seconds.')
+      return
+    }
+
+    const nextElapsedMs = Math.round(nextSeconds * 1000)
+    if (nextElapsedMs < MIN_VALID_TIMER_RUN_MS) {
+      setError('Edited time must be at least 20.00 seconds.')
+      return
+    }
+
+    const runKey = timerScoreKey(run)
+    const previous = scores
+    setError('')
+    setEditingRunKey(runKey)
+    setScores((current) =>
+      current
+        .map((entry) => (timerScoreKey(entry) === runKey ? { ...entry, elapsedMs: nextElapsedMs } : entry))
+        .sort((a, b) => a.elapsedMs - b.elapsedMs),
+    )
+
+    try {
+      await updateTimerScoreElapsedMs({
+        profileId: run.profileId,
+        elapsedMs: run.elapsedMs,
+        createdAt: run.createdAt,
+        nextElapsedMs,
+      })
+    } catch {
+      setScores(previous)
+      setError('Could not edit that attempt. Please try again.')
+    } finally {
+      setEditingRunKey(null)
     }
   }
 
@@ -403,12 +471,14 @@ export function ProfilePage() {
                     <th>Date</th>
                     <th>Personal Best</th>
                     <th>Status</th>
+                    {isAdmin ? <th>Actions</th> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {profileRuns.slice(0, 12).map((run, index) => {
                     const deltaMs = bestRun ? run.elapsedMs - bestRun.elapsedMs : 0
                     const isBest = bestRun ? timerScoreKey(run) === timerScoreKey(bestRun) : false
+                    const editing = editingRunKey === timerScoreKey(run)
                     return (
                       <tr key={timerScoreKey(run)}>
                         <td>{index + 1}</td>
@@ -422,6 +492,18 @@ export function ProfilePage() {
                             <span className="profileSyncDot" aria-label="Synced" title="Synced" />
                           )}
                         </td>
+                        {isAdmin ? (
+                          <td>
+                            <button
+                              type="button"
+                              className="profileTableEditBtn"
+                              onClick={() => void onEditRunTime(run)}
+                              disabled={editing}
+                            >
+                              {editing ? 'Saving...' : 'Edit'}
+                            </button>
+                          </td>
+                        ) : null}
                       </tr>
                     )
                   })}
