@@ -1205,6 +1205,7 @@ input, select, .btn {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin-top: 8px;
+  min-width: 0;
 }
 .timerSummaryRow {
   display: grid;
@@ -1215,6 +1216,7 @@ input, select, .btn {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #f7f7f7;
+  min-width: 0;
 }
 .timerSummaryRow span {
   color: var(--muted);
@@ -1233,7 +1235,7 @@ input, select, .btn {
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
 .timerRow--recent {
-  grid-template-columns: auto auto auto minmax(40px, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 .timerRecentDate {
   font-size: 0.78rem;
@@ -1322,6 +1324,9 @@ input, select, .btn {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 8px;
+}
+.timerPerformanceLists > * {
+  min-width: 0;
 }
 .timerPerformanceBlock h3 {
   margin: 0;
@@ -1848,7 +1853,7 @@ input, select, .btn {
   .card.header {
     padding: 20px 16px;
   }
-  .card.card--pool { padding: 42px 28px; gap: 16px; }
+  .card.card--pool { padding: 38px 20px; gap: 14px; }
   .split { grid-template-columns: 1fr; }
   .homeActionsRow { grid-template-columns: 1fr; }
   .header { align-items: flex-start; flex-wrap: wrap; }
@@ -1929,13 +1934,25 @@ input, select, .btn {
     gap: 8px;
   }
   .timerRow--recent {
-    grid-template-columns: auto auto auto minmax(36px, 1fr);
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 6px;
   }
   .timerRecentDate {
     font-size: 0.72rem;
   }
   .timerRow small { font-size: 0.78rem; }
+  .timerResultsSummary {
+    gap: 6px;
+  }
+  .timerSummaryRow {
+    padding: 8px 6px;
+  }
+  .timerSummaryRow span {
+    font-size: 0.78rem;
+  }
+  .timerSummaryRow strong {
+    font-size: 0.86rem;
+  }
   .timerDeleteBtn:not(.timerDeleteBtn--icon) {
     min-height: 40px;
     min-width: 64px;
