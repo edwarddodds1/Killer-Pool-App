@@ -1073,11 +1073,21 @@ input, select, .btn {
   font-weight: 600;
   color: #2f2f2f;
 }
+.timerPenaltyControls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
 .timerPenaltyBtn {
   min-height: 40px;
   padding: 8px 12px;
   font-size: 0.9rem;
   white-space: nowrap;
+}
+.timerPenaltyBtn--remove {
+  min-height: 36px;
+  font-size: 0.85rem;
 }
 .timerCountdownOption input[type='checkbox'] {
   width: 18px;
@@ -1337,12 +1347,28 @@ input, select, .btn {
 .profileCardHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
+}
+.profileIdentityBlock {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.profileNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.profileNameRow .homeTimerRankBubble {
+  margin-left: auto;
 }
 .profileCardHeader h2 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: clamp(1.45rem, 5.1vw, 2rem);
+  line-height: 1.05;
 }
 .profileFormRating {
   display: inline-flex;
@@ -1372,6 +1398,61 @@ input, select, .btn {
   width: 16px;
   height: 16px;
   display: block;
+}
+
+/* Join page */
+.joinPage {
+  gap: 10px;
+}
+.joinTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.joinTitle {
+  font-size: clamp(2.05rem, 8.2vw, 3.05rem);
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  margin: 0;
+}
+.joinCard {
+  gap: 12px;
+}
+.joinCodeInputWrap {
+  position: relative;
+  margin-top: 6px;
+}
+.joinCodeInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: text;
+}
+.joinCodeSlots {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.joinCodeSlot {
+  min-height: 52px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #f7f7f7;
+  display: grid;
+  place-items: center;
+  font-size: 1.55rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #9097a3;
+}
+.joinCodeSlot--filled {
+  color: #111827;
+  border-color: #c3cad5;
+  background: #fff;
 }
 .profileStatsGrid {
   display: grid;

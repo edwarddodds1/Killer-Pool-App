@@ -8,6 +8,7 @@ import type { PlayerState, RoomState } from '../types'
 import { activePlayer, allocateBalls, pickPlayerByBall, shuffle } from '../utils/game'
 import {
   getProfile,
+  recordKillerPoolMatchResult,
   getRoom,
   getRoomRemote,
   saveProfile,
@@ -125,6 +126,7 @@ export function RoomPage() {
   const inGameUndoRef = useRef<RoomState[]>([])
   const roomSnapshotRef = useRef<string>(JSON.stringify(room))
   const roomRef = useRef<RoomState | null>(room)
+  const recordedResultKeysRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
     if (!profile) {
@@ -667,6 +669,19 @@ export function RoomPage() {
     const survivors = room.players.filter((player) => !player.eliminated)
     return [...survivors, ...eliminatedReverse]
   })()
+
+  useEffect(() => {
+    if (!room || room.mode !== 'killer' || room.status !== 'results') return
+    const gameKey = `${room.code}:${room.gameNumber}`
+    if (recordedResultKeysRef.current.has(gameKey)) return
+
+    const winnerId = resultsOrder[0]?.id
+    for (const player of room.players) {
+      if (player.isBot) continue
+      recordKillerPoolMatchResult(player.id, player.id === winnerId)
+    }
+    recordedResultKeysRef.current.add(gameKey)
+  }, [resultsOrder, room])
 
   const breakerPlayer = room.playOrder.length
     ? room.players.find((player) => player.id === room.playOrder[0])?.username

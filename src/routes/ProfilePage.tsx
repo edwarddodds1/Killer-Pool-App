@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { TimerScore } from '../types'
 import { formatTimerElapsedMs, timerScoreBelongsToProfile, timerScoreKey } from '../../shared/timerLeaderboard'
-import { deleteCurrentAccount, flushPendingTimerScores, getProfile, getTimerScores } from '../utils/store'
+import { deleteCurrentAccount, flushPendingTimerScores, getKillerPoolStats, getProfile, getTimerScores } from '../utils/store'
 
 function formatRunDate(iso: string) {
   const date = new Date(iso)
@@ -87,6 +87,17 @@ export function ProfilePage() {
   }, [profileRuns])
 
   const latestRun = profileRuns[0] ?? null
+  const killerPoolProfileId = viewingOwnProfile ? profile?.id : (profileId ?? null)
+  const killerPoolStats = useMemo(() => {
+    if (!killerPoolProfileId) return { wins: 0, games: 0 }
+    return getKillerPoolStats(killerPoolProfileId)
+  }, [killerPoolProfileId])
+  const killerWinRatioLabel = `${killerPoolStats.wins}/${killerPoolStats.games}`
+  const killerWinPct = killerPoolStats.games > 0 ? Math.round((killerPoolStats.wins / killerPoolStats.games) * 100) : null
+  const timerRank = useMemo(() => {
+    if (!bestRun) return null
+    return scores.filter((run) => run.elapsedMs < bestRun.elapsedMs).length + 1
+  }, [bestRun, scores])
   const fiveGameAverageMs = useMemo(() => {
     if (!profileRuns.length) return null
     const recentRuns = profileRuns.slice(0, 5)
@@ -240,22 +251,32 @@ export function ProfilePage() {
 
       <section className="card card--pool profileCard">
         <header className="profileCardHeader">
-          <h2>{profileDisplayName}</h2>
-          <div className="profileFormRating" aria-label={`Form rating ${formStars} out of 5`}>
-            <span className="profileFormLabel">Form</span>
-            {Array.from({ length: 5 }, (_, index) => (
-              <svg
-                key={index}
-                viewBox="0 0 24 24"
-                className={`profileFormStar ${index < formStars ? 'profileFormStar--filled' : ''}`}
-                aria-hidden="true"
-              >
-                <path
-                  d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
-                  fill="currentColor"
-                />
-              </svg>
-            ))}
+          <div className="profileIdentityBlock">
+            <div className="profileNameRow">
+              <h2>{profileDisplayName}</h2>
+              {timerRank !== null ? (
+                <div className="homeTimerRankBubble" aria-label="Current timer leaderboard rank">
+                  <span className="homeTimerRankBubble__label">Timer pool</span>
+                  <span className="homeTimerRankBubble__value">#{timerRank} ranked player</span>
+                </div>
+              ) : null}
+            </div>
+            <div className="profileFormRating" aria-label={`Form rating ${formStars} out of 5`}>
+              <span className="profileFormLabel">Form</span>
+              {Array.from({ length: 5 }, (_, index) => (
+                <svg
+                  key={index}
+                  viewBox="0 0 24 24"
+                  className={`profileFormStar ${index < formStars ? 'profileFormStar--filled' : ''}`}
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
+                    fill="currentColor"
+                  />
+                </svg>
+              ))}
+            </div>
           </div>
         </header>
 
@@ -285,6 +306,14 @@ export function ProfilePage() {
           <article className="profileStatCard">
             <span>5 game average</span>
             <strong>{fiveGameAverageMs !== null ? formatTimerElapsedMs(fiveGameAverageMs) : '--:--.--'}</strong>
+          </article>
+          <article className="profileStatCard">
+            <span>Killer win ratio</span>
+            <strong>{killerPoolStats.games > 0 ? killerWinRatioLabel : '--'}</strong>
+          </article>
+          <article className="profileStatCard">
+            <span>Killer win %</span>
+            <strong>{killerWinPct !== null ? `${killerWinPct}%` : '--'}</strong>
           </article>
         </section>
 

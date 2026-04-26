@@ -230,6 +230,14 @@ export function TimerPoolPage() {
     setRunningSince((current) => (current === null ? null : current - 10_000))
   }
 
+  const removePenalty = () => {
+    if (saving || countdownRemaining !== null) return
+    if (penaltyCount <= 0) return
+    setPenaltyCount((current) => Math.max(0, current - 1))
+    setElapsedMs((current) => Math.max(0, current - 10_000))
+    setRunningSince((current) => (current === null ? null : current + 10_000))
+  }
+
   const elapsedParts = formatElapsedParts(elapsedMs)
 
   return (
@@ -298,14 +306,26 @@ export function TimerPoolPage() {
             />
             5s countdown
           </label>
-          <button
-            type="button"
-            className="btn btn--small timerPenaltyBtn"
-            onClick={addPenalty}
-            disabled={saving || countdownRemaining !== null || (runningSince === null && elapsedMs === 0)}
-          >
-            +10s penalty
-          </button>
+          <div className="timerPenaltyControls">
+            <button
+              type="button"
+              className="btn btn--small timerPenaltyBtn"
+              onClick={addPenalty}
+              disabled={saving || countdownRemaining !== null || (runningSince === null && elapsedMs === 0)}
+            >
+              +10s penalty
+            </button>
+            {penaltyCount > 0 ? (
+              <button
+                type="button"
+                className="btn btn--small timerPenaltyBtn timerPenaltyBtn--remove"
+                onClick={removePenalty}
+                disabled={saving || countdownRemaining !== null}
+              >
+                Remove penalty
+              </button>
+            ) : null}
+          </div>
         </div>
         <section className="timerRules" aria-label="Timer rules">
           <h2 className="timerRules__title">Rules</h2>

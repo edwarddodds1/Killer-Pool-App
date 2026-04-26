@@ -9,8 +9,10 @@ const ROOMS_KEY = 'killer_pool_rooms_v1'
 const PROFILE_KEY = 'killer_pool_profile_v1'
 const TIMER_SCORES_KEY = 'killer_pool_timer_scores_v1'
 const ACCOUNTS_KEY = 'killer_pool_accounts_v1'
+const KILLER_POOL_STATS_KEY = 'killer_pool_killer_stats_v1'
 
 type RoomIndex = Record<string, RoomState>
+type KillerPoolStatsIndex = Record<string, { wins: number; games: number }>
 
 type TimerScoreRow = {
   id?: number
@@ -59,6 +61,26 @@ function loadJson<T>(key: string, fallback: T): T {
 
 function saveJson<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value))
+}
+
+export function getKillerPoolStats(profileId: string) {
+  const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
+  const next = all[profileId]
+  if (!next) return { wins: 0, games: 0 }
+  return {
+    wins: Math.max(0, next.wins || 0),
+    games: Math.max(0, next.games || 0),
+  }
+}
+
+export function recordKillerPoolMatchResult(profileId: string, didWin: boolean) {
+  const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
+  const current = all[profileId] ?? { wins: 0, games: 0 }
+  all[profileId] = {
+    wins: current.wins + (didWin ? 1 : 0),
+    games: current.games + 1,
+  }
+  saveJson(KILLER_POOL_STATS_KEY, all)
 }
 
 export function getProfile() {
@@ -644,6 +666,32 @@ export async function deleteTimerScore(input: Pick<TimerScore, 'profileId' | 'el
   await supabase
     .from(TIMER_SCORES_TABLE)
     .delete()
+    .eq('profile_id', input.profileId)
+    .eq('elapsed_ms', input.elapsedMs)
+    .eq('created_at', input.createdAt)
+}
+
+export async function updateTimerScoreElapsedMs(
+  input: Pick<TimerScore, 'profileId' | 'elapsedMs' | 'createdAt'> & { nextElapsedMs: number },
+) {
+  const local = getTimerScoresLocal()
+  const nextLocal = local.map((score) => {
+    if (
+      score.profileId === input.profileId &&
+      score.elapsedMs === input.elapsedMs &&
+      score.createdAt === input.createdAt
+    ) {
+      return { ...score, elapsedMs: input.nextElapsedMs }
+    }
+    return score
+  })
+  saveTimerScoresLocal(sortTimerScores(nextLocal))
+
+  if (!supabase) return
+
+  await supabase
+    .from(TIMER_SCORES_TABLE)
+    .update({ elapsed_ms: input.nextElapsedMs })
     .eq('profile_id', input.profileId)
     .eq('elapsed_ms', input.elapsedMs)
     .eq('created_at', input.createdAt)
