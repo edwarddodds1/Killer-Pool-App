@@ -136,3 +136,36 @@ for update
 to anon, authenticated
 using (true)
 with check (true);
+
+create table if not exists public.user_friends (
+  owner_profile_id text not null,
+  friend_profile_id text not null,
+  friend_username text not null,
+  created_at timestamptz not null default now(),
+  primary key (owner_profile_id, friend_profile_id),
+  check (owner_profile_id <> friend_profile_id)
+);
+
+alter table public.user_friends enable row level security;
+grant select, insert, delete on table public.user_friends to anon, authenticated;
+
+drop policy if exists "user_friends_all_select" on public.user_friends;
+create policy "user_friends_all_select"
+on public.user_friends
+for select
+to anon, authenticated
+using (true);
+
+drop policy if exists "user_friends_all_insert" on public.user_friends;
+create policy "user_friends_all_insert"
+on public.user_friends
+for insert
+to anon, authenticated
+with check (true);
+
+drop policy if exists "user_friends_all_delete" on public.user_friends;
+create policy "user_friends_all_delete"
+on public.user_friends
+for delete
+to anon, authenticated
+using (true);

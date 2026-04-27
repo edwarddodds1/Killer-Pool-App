@@ -59,6 +59,17 @@ function sortBallsAsc(balls: number[]) {
   return [...balls].sort((a, b) => a - b)
 }
 
+function getResultsOrder(room: RoomState): PlayerState[] {
+  const byId = new Map(room.players.map((player) => [player.id, player]))
+  const eliminatedReverse = room.eliminationOrder
+    .slice()
+    .reverse()
+    .map((id) => byId.get(id))
+    .filter((player): player is PlayerState => Boolean(player))
+  const survivors = room.players.filter((player) => !player.eliminated)
+  return [...survivors, ...eliminatedReverse]
+}
+
 function roomSyncRevision(room: RoomState | null | undefined) {
   return room?.syncRevision ?? 0
 }
@@ -312,6 +323,22 @@ export function RoomPage() {
       setPendingReadyState(null)
     }
   }, [me, pendingReadyState])
+
+  useEffect(() => {
+    if (!room || room.mode !== 'killer' || room.status !== 'results') return
+    const gameKey = `${room.code}:${room.gameNumber}`
+    if (recordedResultKeysRef.current.has(gameKey)) return
+    if (room.players.some((player) => player.isBot)) {
+      recordedResultKeysRef.current.add(gameKey)
+      return
+    }
+    const winnerId = getResultsOrder(room)[0]?.id
+    for (const player of room.players) {
+      if (player.isBot) continue
+      recordKillerPoolMatchResult(player.id, player.id === winnerId)
+    }
+    recordedResultKeysRef.current.add(gameKey)
+  }, [room])
 
   const saveRoom = (next: RoomState, oldCode?: string) => {
     const stamped = stampRoomForWrite(next, roomRef.current)
@@ -730,23 +757,6 @@ export function RoomPage() {
   })()
   const showPreGameModeLabel = room.status === 'lobby' || room.status === 'allocation' || room.status === 'order'
   const modeAllocationLabel = room.killerAllocationMode === 'multi' ? 'Multi ball' : 'Single ball'
-
-  useEffect(() => {
-    if (!room || room.mode !== 'killer' || room.status !== 'results') return
-    const gameKey = `${room.code}:${room.gameNumber}`
-    if (recordedResultKeysRef.current.has(gameKey)) return
-    if (room.players.some((player) => player.isBot)) {
-      recordedResultKeysRef.current.add(gameKey)
-      return
-    }
-
-    const winnerId = resultsOrder[0]?.id
-    for (const player of room.players) {
-      if (player.isBot) continue
-      recordKillerPoolMatchResult(player.id, player.id === winnerId)
-    }
-    recordedResultKeysRef.current.add(gameKey)
-  }, [resultsOrder, room])
 
   const breakerPlayer = room.playOrder.length
     ? room.players.find((player) => player.id === room.playOrder[0])?.username

@@ -4,6 +4,7 @@ import type { TimerScore } from '../types'
 import { formatTimerElapsedMs, timerScoreBelongsToProfile, timerScoreKey } from '../../shared/timerLeaderboard'
 import {
   deleteCurrentAccount,
+  findKnownUsernameForProfileId,
   flushPendingTimerScores,
   getKillerPoolStats,
   getProfile,
@@ -112,19 +113,32 @@ export function ProfilePage() {
     }
   }
 
+  // `getProfile()` returns a fresh object every render; putting `profile` in the
+  // dependency array retriggers this effect forever (setScores → re-render → new profile ref).
+  const sessionProfileId = profile?.id ?? ''
+
   useEffect(() => {
-    if (!profile) {
+    if (!sessionProfileId) {
       navigate('/', { replace: true })
       return
     }
 
     void reloadScores()
-  }, [navigate, profile])
+  }, [navigate, sessionProfileId, profileId, requestedUsername])
 
   const viewingOwnProfile = !profileId
+  // Defensive fallback: if a profile is opened by id with no ?username= query
+  // (e.g. an old link or a leaderboard click that lost the suffix), try the
+  // local accounts cache so we can still match score rows by username when
+  // their profile_id has drifted from the canonical user_accounts row.
+  const cachedUsernameForProfileId = useMemo(() => {
+    if (viewingOwnProfile || !profileId) return ''
+    return findKnownUsernameForProfileId(profileId) ?? ''
+  }, [profileId, viewingOwnProfile])
   const profileRuns = useMemo(() => {
     if (!profile && viewingOwnProfile) return []
     const normalizedRequestedName = requestedUsername.toLowerCase()
+    const normalizedCachedName = cachedUsernameForProfileId.trim().toLowerCase()
     return deferredScores
       .filter((score) => {
         if (viewingOwnProfile) {
@@ -132,17 +146,20 @@ export function ProfilePage() {
           return timerScoreBelongsToProfile(score, profile)
         }
         if (profileId && score.profileId === profileId) return true
-        if (!normalizedRequestedName) return false
-        return score.username.trim().toLowerCase() === normalizedRequestedName
+        const normalizedScoreName = score.username.trim().toLowerCase()
+        if (!normalizedScoreName) return false
+        if (normalizedRequestedName && normalizedScoreName === normalizedRequestedName) return true
+        if (normalizedCachedName && normalizedScoreName === normalizedCachedName) return true
+        return false
       })
       .slice()
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-  }, [deferredScores, profile, profileId, requestedUsername, viewingOwnProfile])
+  }, [cachedUsernameForProfileId, deferredScores, profile, profileId, requestedUsername, viewingOwnProfile])
 
   const profileDisplayName = useMemo(() => {
     if (viewingOwnProfile) return profile?.username ?? 'Player'
-    return profileRuns[0]?.username ?? (requestedUsername || 'Player')
-  }, [profile?.username, profileRuns, requestedUsername, viewingOwnProfile])
+    return profileRuns[0]?.username ?? (requestedUsername || cachedUsernameForProfileId || 'Player')
+  }, [cachedUsernameForProfileId, profile?.username, profileRuns, requestedUsername, viewingOwnProfile])
 
   const bestRun = useMemo(() => {
     if (!profileRuns.length) return null
@@ -155,7 +172,13 @@ export function ProfilePage() {
   }, [profileRuns])
 
   const latestRun = profileRuns[0] ?? null
-  const killerPoolProfileId = viewingOwnProfile ? profile?.id : (profileId ?? null)
+  // When viewing by username query (without /profile/:profileId), recover the profile id from runs.
+  const inferredViewedProfileId = useMemo(() => {
+    if (viewingOwnProfile) return null
+    if (profileId) return profileId
+    return profileRuns.find((run) => Boolean(run.profileId))?.profileId ?? null
+  }, [profileId, profileRuns, viewingOwnProfile])
+  const killerPoolProfileId = viewingOwnProfile ? profile?.id : inferredViewedProfileId
   const killerPoolStats = useMemo(() => {
     if (!killerPoolProfileId) return { wins: 0, games: 0 }
     return getKillerPoolStats(killerPoolProfileId)

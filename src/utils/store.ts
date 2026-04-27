@@ -10,6 +10,9 @@ const PROFILE_KEY = 'killer_pool_profile_v1'
 const TIMER_SCORES_KEY = 'killer_pool_timer_scores_v1'
 const ACCOUNTS_KEY = 'killer_pool_accounts_v1'
 const KILLER_POOL_STATS_KEY = 'killer_pool_killer_stats_v2'
+// Legacy key from before the v2 bump. Kept readable so devices that still hold
+// pre-bump win/game totals can have them migrated forward instead of lost.
+const KILLER_POOL_STATS_LEGACY_KEY = 'killer_pool_killer_stats_v1'
 
 type RoomIndex = Record<string, RoomState>
 type KillerPoolStatsIndex = Record<string, { wins: number; games: number }>
@@ -63,19 +66,46 @@ function saveJson<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
+function readLegacyKillerPoolStats(profileId: string) {
+  const legacy = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_LEGACY_KEY, {})
+  const entry = legacy[profileId]
+  if (!entry) return null
+  const wins = Math.max(0, entry.wins || 0)
+  const games = Math.max(0, entry.games || 0)
+  if (wins === 0 && games === 0) return null
+  return { wins, games }
+}
+
 export function getKillerPoolStats(profileId: string) {
   const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
-  const next = all[profileId]
-  if (!next) return { wins: 0, games: 0 }
+  const current = all[profileId]
+  const hasCurrent = current && (current.wins > 0 || current.games > 0)
+
+  if (!hasCurrent) {
+    const legacy = readLegacyKillerPoolStats(profileId)
+    if (legacy) {
+      // Seed v2 from v1 once so subsequent reads/writes stay on the new key.
+      all[profileId] = legacy
+      saveJson(KILLER_POOL_STATS_KEY, all)
+      return legacy
+    }
+  }
+
+  if (!current) return { wins: 0, games: 0 }
   return {
-    wins: Math.max(0, next.wins || 0),
-    games: Math.max(0, next.games || 0),
+    wins: Math.max(0, current.wins || 0),
+    games: Math.max(0, current.games || 0),
   }
 }
 
 export function recordKillerPoolMatchResult(profileId: string, didWin: boolean) {
   const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
-  const current = all[profileId] ?? { wins: 0, games: 0 }
+  let baseline = all[profileId]
+  if (!baseline || (baseline.wins === 0 && baseline.games === 0)) {
+    const legacy = readLegacyKillerPoolStats(profileId)
+    if (legacy) baseline = legacy
+  }
+  const current = baseline ?? { wins: 0, games: 0 }
   all[profileId] = {
     wins: current.wins + (didWin ? 1 : 0),
     games: current.games + 1,
@@ -93,6 +123,19 @@ export function saveProfile(profile: Profile) {
 
 export function clearProfile() {
   localStorage.removeItem(PROFILE_KEY)
+}
+
+/**
+ * Best-effort lookup from the local accounts cache for the username that owns
+ * a given profile id. Used as a defensive fallback when a profile is opened
+ * via /profile/:profileId without a ?username= query and the score rows have
+ * drifted profile_ids relative to the canonical user_accounts row.
+ */
+export function findKnownUsernameForProfileId(profileId: string): string | null {
+  if (!profileId) return null
+  const accounts = loadJson<AccountRecord[]>(ACCOUNTS_KEY, [])
+  const match = accounts.find((account) => account.profileId === profileId)
+  return match?.username?.trim() || null
 }
 
 /** `undefined` = request error (ignore); `null` = no account row. */
