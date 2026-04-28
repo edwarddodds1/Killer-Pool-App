@@ -1567,7 +1567,7 @@ input, select, .btn {
 .timerRow--leaderboardCompact {
   padding: 11px 13px;
   /* Fixed rank column so avatars stay aligned when rank goes to double/triple digits */
-  grid-template-columns: minmax(3rem, 3rem) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(3.75rem, 3.75rem) minmax(0, 1fr) auto;
   gap: 10px;
 }
 .timerRow--leaderboardCompact > span:first-of-type {
@@ -1575,6 +1575,7 @@ input, select, .btn {
   font-variant-numeric: tabular-nums;
   text-align: right;
   justify-self: stretch;
+  padding-right: 4px;
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
 .timerRow--recent {
