@@ -23,7 +23,7 @@ function HomeGlyph() {
  * Right-aligned app shortcuts: Profile → Social → Home (matches main heading row layout).
  */
 export function AppHeaderNavIcons() {
-  const { pendingFriendRequests } = useSocialNotifications()
+  const { hasUnreadNotifications, pendingFriendRequests } = useSocialNotifications()
 
   const btnClass = (isActive: boolean) =>
     `timerHomeBtn timerHomeBtn--small appHeaderNavIcons__btn${isActive ? ' appHeaderNavIcons__btn--active' : ''}`
@@ -40,10 +40,15 @@ export function AppHeaderNavIcons() {
         title="Social"
       >
         <SocialNavIcon className="timerHomeIcon" size={38} />
-        {pendingFriendRequests > 0 ? (
-          <span className="appHeaderNavIcons__badge" aria-label={`${pendingFriendRequests} pending friend requests`}>
-            {pendingFriendRequests > 9 ? '9+' : pendingFriendRequests}
-          </span>
+        {hasUnreadNotifications ? (
+          <span
+            className="appHeaderNavIcons__dot"
+            aria-label={
+              pendingFriendRequests > 0
+                ? `${pendingFriendRequests} social notifications pending`
+                : 'New social notifications'
+            }
+          />
         ) : null}
       </NavLink>
       <NavLink to="/" end className={({ isActive }) => btnClass(isActive)} aria-label="Home" title="Home">

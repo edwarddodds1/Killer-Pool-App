@@ -35,6 +35,15 @@ import {
 
 const ADMIN_USERNAMES = new Set(['edwarddodds1'])
 const MIN_VALID_TIMER_RUN_MS = 20_000
+const AVATAR_CROP_FRAME_SIZE = 280
+const AVATAR_UPLOAD_SIZE = 512
+
+type AvatarCropDraft = {
+  file: File
+  previewUrl: string
+  width: number
+  height: number
+}
 
 function formatRunDate(iso: string) {
   const date = new Date(iso)
@@ -70,6 +79,94 @@ function clamp01(value: number) {
 
 function clamp05To5(value: number) {
   return Math.max(0.5, Math.min(5, value))
+}
+
+function clampRange(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function getPointerDistance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return Math.hypot(b.x - a.x, b.y - a.y)
+}
+
+function getPointerCenter(a: { x: number; y: number }, b: { x: number; y: number }) {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+  }
+}
+
+function getAvatarCropMetrics(width: number, height: number, zoom: number) {
+  const baseScale = Math.max(AVATAR_CROP_FRAME_SIZE / width, AVATAR_CROP_FRAME_SIZE / height)
+  const scale = baseScale * zoom
+  const drawWidth = width * scale
+  const drawHeight = height * scale
+  const offsetXRange = Math.max(0, (drawWidth - AVATAR_CROP_FRAME_SIZE) / 2)
+  const offsetYRange = Math.max(0, (drawHeight - AVATAR_CROP_FRAME_SIZE) / 2)
+  return { scale, drawWidth, drawHeight, offsetXRange, offsetYRange }
+}
+
+async function readAvatarDraft(file: File): Promise<AvatarCropDraft> {
+  const previewUrl = URL.createObjectURL(file)
+  try {
+    const image = new Image()
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve()
+      image.onerror = () => reject(new Error('Could not read this image. Try another photo.'))
+      image.src = previewUrl
+    })
+    return {
+      file,
+      previewUrl,
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+    }
+  } catch (error) {
+    URL.revokeObjectURL(previewUrl)
+    throw error
+  }
+}
+
+async function buildCroppedAvatarFile(params: {
+  draft: AvatarCropDraft
+  zoom: number
+  offsetX: number
+  offsetY: number
+  profileId: string
+}) {
+  const image = new Image()
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve()
+    image.onerror = () => reject(new Error('Could not prepare this image for upload.'))
+    image.src = params.draft.previewUrl
+  })
+
+  const canvas = document.createElement('canvas')
+  canvas.width = AVATAR_UPLOAD_SIZE
+  canvas.height = AVATAR_UPLOAD_SIZE
+  const context = canvas.getContext('2d')
+  if (!context) {
+    throw new Error('Your browser could not prepare the cropped profile picture.')
+  }
+
+  const { scale } = getAvatarCropMetrics(params.draft.width, params.draft.height, params.zoom)
+  const outputScale = AVATAR_UPLOAD_SIZE / AVATAR_CROP_FRAME_SIZE
+  const drawWidth = params.draft.width * scale * outputScale
+  const drawHeight = params.draft.height * scale * outputScale
+  const dx = ((AVATAR_CROP_FRAME_SIZE - params.draft.width * scale) / 2 + params.offsetX) * outputScale
+  const dy = ((AVATAR_CROP_FRAME_SIZE - params.draft.height * scale) / 2 + params.offsetY) * outputScale
+
+  context.clearRect(0, 0, AVATAR_UPLOAD_SIZE, AVATAR_UPLOAD_SIZE)
+  context.drawImage(image, dx, dy, drawWidth, drawHeight)
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((next) => {
+      if (next) resolve(next)
+      else reject(new Error('Could not export the cropped profile picture.'))
+    }, 'image/jpeg', 0.92)
+  })
+
+  return new File([blob], `${params.profileId}.jpg`, { type: 'image/jpeg' })
 }
 
 function mean(values: number[]) {
@@ -120,10 +217,36 @@ export function ProfilePage() {
   const [friendBusy, setFriendBusy] = useState(false)
   const [friendMsg, setFriendMsg] = useState('')
   const [avatarBusy, setAvatarBusy] = useState(false)
+  const [avatarCropDraft, setAvatarCropDraft] = useState<AvatarCropDraft | null>(null)
+  const [avatarCropZoom, setAvatarCropZoom] = useState(1)
+  const [avatarCropOffsetX, setAvatarCropOffsetX] = useState(0)
+  const [avatarCropOffsetY, setAvatarCropOffsetY] = useState(0)
   const [killerStatsEpoch, setKillerStatsEpoch] = useState(0)
   const avatarInputRef = useRef<HTMLInputElement>(null)
+  const avatarPointerPositionsRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const avatarPanStateRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    originOffsetX: number
+    originOffsetY: number
+  } | null>(null)
+  const avatarPinchStateRef = useRef<{
+    pointerA: number
+    pointerB: number
+    startDistance: number
+    startZoom: number
+    startOffsetX: number
+    startOffsetY: number
+    startCenterX: number
+    startCenterY: number
+  } | null>(null)
   const deferredScores = useDeferredValue(scores)
   const requestedUsername = (searchParams.get('username') ?? '').trim()
+  const avatarCropMetrics = useMemo(() => {
+    if (!avatarCropDraft) return null
+    return getAvatarCropMetrics(avatarCropDraft.width, avatarCropDraft.height, avatarCropZoom)
+  }, [avatarCropDraft, avatarCropZoom])
   const isAdmin = useMemo(() => {
     if (!profile) return false
     return ADMIN_USERNAMES.has(profile.username.trim().toLowerCase())
@@ -156,6 +279,19 @@ export function ProfilePage() {
 
     void reloadScores()
   }, [navigate, sessionProfileId, profileId, requestedUsername])
+
+  useEffect(() => {
+    if (!avatarCropDraft?.previewUrl) return
+    return () => {
+      URL.revokeObjectURL(avatarCropDraft.previewUrl)
+    }
+  }, [avatarCropDraft?.previewUrl])
+
+  useEffect(() => {
+    if (!avatarCropMetrics) return
+    setAvatarCropOffsetX((current) => clampRange(current, -avatarCropMetrics.offsetXRange, avatarCropMetrics.offsetXRange))
+    setAvatarCropOffsetY((current) => clampRange(current, -avatarCropMetrics.offsetYRange, avatarCropMetrics.offsetYRange))
+  }, [avatarCropMetrics])
 
   const viewingOwnProfile = !profileId
   // Defensive fallback: if a profile is opened by id with no ?username= query
@@ -499,16 +635,163 @@ export function ProfilePage() {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file || !profile?.id || !profile.sessionId) return
+    setError('')
+    try {
+      const draft = await readAvatarDraft(file)
+      setAvatarCropDraft(draft)
+      setAvatarCropZoom(1)
+      setAvatarCropOffsetX(0)
+      setAvatarCropOffsetY(0)
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : 'Photo upload failed.')
+    }
+  }
+
+  const onCancelAvatarCrop = () => {
+    if (avatarBusy) return
+    avatarPointerPositionsRef.current.clear()
+    avatarPanStateRef.current = null
+    avatarPinchStateRef.current = null
+    setAvatarCropDraft(null)
+    setAvatarCropZoom(1)
+    setAvatarCropOffsetX(0)
+    setAvatarCropOffsetY(0)
+  }
+
+  const onSaveAvatarCrop = async () => {
+    if (!avatarCropDraft || !profile?.id || !profile.sessionId) return
     setAvatarBusy(true)
     setError('')
     try {
+      const file = await buildCroppedAvatarFile({
+        draft: avatarCropDraft,
+        zoom: avatarCropZoom,
+        offsetX: avatarCropOffsetX,
+        offsetY: avatarCropOffsetY,
+        profileId: profile.id,
+      })
       const url = await uploadProfileAvatar({ profileId: profile.id, file })
       primeAvatarCache(profile.id, url)
+      avatarPointerPositionsRef.current.clear()
+      avatarPanStateRef.current = null
+      avatarPinchStateRef.current = null
+      setAvatarCropDraft(null)
+      setAvatarCropZoom(1)
+      setAvatarCropOffsetX(0)
+      setAvatarCropOffsetY(0)
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Photo upload failed.')
     } finally {
       setAvatarBusy(false)
     }
+  }
+
+  const onAvatarCropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!avatarCropMetrics || avatarBusy) return
+    const nextPoint = { x: event.clientX, y: event.clientY }
+    avatarPointerPositionsRef.current.set(event.pointerId, nextPoint)
+    event.currentTarget.setPointerCapture(event.pointerId)
+
+    const entries = [...avatarPointerPositionsRef.current.entries()]
+    if (entries.length >= 2) {
+      const [first, second] = entries
+      if (!first || !second) return
+      const center = getPointerCenter(first[1], second[1])
+      avatarPinchStateRef.current = {
+        pointerA: first[0],
+        pointerB: second[0],
+        startDistance: Math.max(1, getPointerDistance(first[1], second[1])),
+        startZoom: avatarCropZoom,
+        startOffsetX: avatarCropOffsetX,
+        startOffsetY: avatarCropOffsetY,
+        startCenterX: center.x,
+        startCenterY: center.y,
+      }
+      avatarPanStateRef.current = null
+      return
+    }
+
+    avatarPanStateRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      originOffsetX: avatarCropOffsetX,
+      originOffsetY: avatarCropOffsetY,
+    }
+  }
+
+  const onAvatarCropPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!avatarCropDraft || avatarBusy) return
+    const existing = avatarPointerPositionsRef.current.get(event.pointerId)
+    if (!existing) return
+    avatarPointerPositionsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+
+    const pinch = avatarPinchStateRef.current
+    if (pinch) {
+      const pointA = avatarPointerPositionsRef.current.get(pinch.pointerA)
+      const pointB = avatarPointerPositionsRef.current.get(pinch.pointerB)
+      if (!pointA || !pointB) return
+
+      const nextZoom = clampRange(
+        pinch.startZoom * (getPointerDistance(pointA, pointB) / Math.max(1, pinch.startDistance)),
+        1,
+        3,
+      )
+      const nextMetrics = getAvatarCropMetrics(avatarCropDraft.width, avatarCropDraft.height, nextZoom)
+      const center = getPointerCenter(pointA, pointB)
+      const deltaX = center.x - pinch.startCenterX
+      const deltaY = center.y - pinch.startCenterY
+      setAvatarCropZoom(nextZoom)
+      setAvatarCropOffsetX(clampRange(pinch.startOffsetX + deltaX, -nextMetrics.offsetXRange, nextMetrics.offsetXRange))
+      setAvatarCropOffsetY(clampRange(pinch.startOffsetY + deltaY, -nextMetrics.offsetYRange, nextMetrics.offsetYRange))
+      return
+    }
+
+    const pan = avatarPanStateRef.current
+    if (!pan || pan.pointerId !== event.pointerId || !avatarCropMetrics) return
+    const deltaX = event.clientX - pan.startX
+    const deltaY = event.clientY - pan.startY
+    setAvatarCropOffsetX(clampRange(pan.originOffsetX + deltaX, -avatarCropMetrics.offsetXRange, avatarCropMetrics.offsetXRange))
+    setAvatarCropOffsetY(clampRange(pan.originOffsetY + deltaY, -avatarCropMetrics.offsetYRange, avatarCropMetrics.offsetYRange))
+  }
+
+  const onAvatarCropPointerEnd = (event: React.PointerEvent<HTMLDivElement>) => {
+    avatarPointerPositionsRef.current.delete(event.pointerId)
+
+    const entries = [...avatarPointerPositionsRef.current.entries()]
+    if (entries.length >= 2) {
+      const [first, second] = entries
+      if (!first || !second) return
+      const center = getPointerCenter(first[1], second[1])
+      avatarPinchStateRef.current = {
+        pointerA: first[0],
+        pointerB: second[0],
+        startDistance: Math.max(1, getPointerDistance(first[1], second[1])),
+        startZoom: avatarCropZoom,
+        startOffsetX: avatarCropOffsetX,
+        startOffsetY: avatarCropOffsetY,
+        startCenterX: center.x,
+        startCenterY: center.y,
+      }
+      avatarPanStateRef.current = null
+      return
+    }
+
+    avatarPinchStateRef.current = null
+    if (entries.length === 1) {
+      const [remainingId, point] = entries[0]
+      if (!point) return
+      avatarPanStateRef.current = {
+        pointerId: remainingId,
+        startX: point.x,
+        startY: point.y,
+        originOffsetX: avatarCropOffsetX,
+        originOffsetY: avatarCropOffsetY,
+      }
+      return
+    }
+
+    avatarPanStateRef.current = null
   }
 
   const onAddFriendProfile = async () => {
@@ -896,24 +1179,20 @@ export function ProfilePage() {
 
         <section className="profileChartSection">
           <h3>Daily Average</h3>
-          {weekdayAverages.some((entry) => entry.averageMs !== null) ? (
-            <div className="profileBars">
-              {weekdayAverages.map((entry) => {
-                const heightPct = entry.averageMs ? Math.max(12, (entry.averageMs / maxWeekdayAverage) * 100) : 0
-                return (
-                  <div key={entry.label} className="profileBarCol">
-                    <div className="profileBarTrack">
-                      {entry.averageMs ? <div className="profileBarFill" style={{ height: `${heightPct}%` }} /> : null}
-                    </div>
-                    <span className="profileBarLabel">{entry.label}</span>
-                    <small>{entry.averageMs ? formatMinutesSeconds(entry.averageMs) : '--:--'}</small>
+          <div className="profileBars">
+            {weekdayAverages.map((entry) => {
+              const heightPct = entry.averageMs ? Math.max(12, (entry.averageMs / maxWeekdayAverage) * 100) : 0
+              return (
+                <div key={entry.label} className="profileBarCol">
+                  <div className="profileBarTrack">
+                    {entry.averageMs ? <div className="profileBarFill" style={{ height: `${heightPct}%` }} /> : null}
                   </div>
-                )
-              })}
-            </div>
-          ) : (
-            <p className="muted">Play runs across different days to compare pace patterns.</p>
-          )}
+                  <span className="profileBarLabel">{entry.label}</span>
+                  <small>{entry.averageMs ? formatMinutesSeconds(entry.averageMs) : '--:--'}</small>
+                </div>
+              )
+            })}
+          </div>
         </section>
 
         <section className="profileTableSection profileH2hSection" aria-label="Head to head">
@@ -1063,6 +1342,55 @@ export function ProfilePage() {
                 className="profileTableEditBtn profileTableEditBtn--secondary"
                 onClick={onCancelEditRun}
                 disabled={editingRunKey !== null}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {avatarCropDraft && avatarCropMetrics ? (
+        <div className="profileEditModalOverlay" role="presentation" onClick={onCancelAvatarCrop}>
+          <div
+            className="profileEditModal profileAvatarCropModal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-avatar-crop-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="profile-avatar-crop-title">Crop profile picture</h3>
+            <p className="muted">Drag to move the photo. On mobile, pinch with two fingers to zoom. The circle shows how it will look in the app.</p>
+            <div className="profileAvatarCropStage">
+              <div
+                className="profileAvatarCropFrame"
+                aria-label="Profile picture crop preview"
+                onPointerDown={onAvatarCropPointerDown}
+                onPointerMove={onAvatarCropPointerMove}
+                onPointerUp={onAvatarCropPointerEnd}
+                onPointerCancel={onAvatarCropPointerEnd}
+                onPointerLeave={onAvatarCropPointerEnd}
+              >
+                <img
+                  src={avatarCropDraft.previewUrl}
+                  alt="Selected profile picture preview"
+                  className="profileAvatarCropImage"
+                  style={{
+                    width: avatarCropMetrics.drawWidth,
+                    height: avatarCropMetrics.drawHeight,
+                    transform: `translate(calc(-50% + ${avatarCropOffsetX}px), calc(-50% + ${avatarCropOffsetY}px))`,
+                  }}
+                />
+              </div>
+            </div>
+            <div className="profileEditModalActions">
+              <button type="button" className="profileTableEditBtn" onClick={() => void onSaveAvatarCrop()} disabled={avatarBusy}>
+                {avatarBusy ? 'Saving...' : 'Save photo'}
+              </button>
+              <button
+                type="button"
+                className="profileTableEditBtn profileTableEditBtn--secondary"
+                onClick={onCancelAvatarCrop}
+                disabled={avatarBusy}
               >
                 Cancel
               </button>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import type { CSSProperties } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { buildNewRoom } from '../utils/game'
 import { isSupabaseEnabled } from '../lib/supabase'
 import {
@@ -39,13 +40,14 @@ import {
   summarizeHeadToHeadForViewer,
   type HeadToHeadRow,
 } from '../services/social/socialHeadToHeadService'
-type TabKey = 'feed' | 'friends' | 'games'
+type TabKey = 'feed' | 'friends' | 'games' | 'notifications'
 
 const PAGE = 10
 
 export function SocialPage() {
   const navigate = useNavigate()
-  const { refreshFriendBadge } = useSocialNotifications()
+  const { hasUnreadNotifications, notifications, refreshFriendBadge, refreshNotifications, markNotificationsSeen } =
+    useSocialNotifications()
   const [tab, setTab] = useState<TabKey>('feed')
   const [, setHydrated] = useState(0)
   const profile = getProfile()
@@ -57,12 +59,15 @@ export function SocialPage() {
     void hydrateProfileSessionFromServer().then((changed) => {
       if (!alive) return
       setHydrated((tick) => tick + 1)
-      if (changed) void refreshFriendBadge()
+      if (changed) {
+        void refreshFriendBadge()
+        void refreshNotifications()
+      }
     })
     return () => {
       alive = false
     }
-  }, [refreshFriendBadge])
+  }, [refreshFriendBadge, refreshNotifications])
 
   const [friends, setFriends] = useState<FriendRecord[]>([])
   const [pendingIn, setPendingIn] = useState<PendingIncomingRequest[]>([])
@@ -86,8 +91,7 @@ export function SocialPage() {
   const [gameSearch, setGameSearch] = useState('')
   const [opponentPick, setOpponentPick] = useState<{ id: string; username: string } | null>(null)
   const [winnerIsMe, setWinnerIsMe] = useState(true)
-  const [ballsMe, setBallsMe] = useState('7')
-  const [ballsOpponent, setBallsOpponent] = useState('7')
+  const [loserBallsRemaining, setLoserBallsRemaining] = useState('7')
   const [gameBusy, setGameBusy] = useState(false)
   const [gameErr, setGameErr] = useState('')
 
@@ -197,8 +201,9 @@ export function SocialPage() {
     }
     if (tab === 'games') void loadH2h()
     if (tab === 'feed') void loadFeed('reset')
+    if (tab === 'notifications') markNotificationsSeen()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, profileId, registered])
+  }, [tab, profileId, registered, markNotificationsSeen])
 
   useEffect(() => {
     if (!h2hRows.length || !profileId) return
@@ -226,6 +231,7 @@ export function SocialPage() {
       setFriendInput('')
       await loadFriendsBlock()
       await refreshFriendBadge()
+      await refreshNotifications()
     } catch (e) {
       setFriendErr(e instanceof Error ? e.message : 'Could not send request.')
     } finally {
@@ -240,6 +246,7 @@ export function SocialPage() {
       await acceptFriendRequest(profileId, id)
       await loadFriendsBlock()
       await refreshFriendBadge()
+      await refreshNotifications()
     } catch (e) {
       setFriendErr(e instanceof Error ? e.message : 'Could not accept.')
     } finally {
@@ -254,6 +261,7 @@ export function SocialPage() {
       await declineFriendRequest(profileId, id)
       await loadFriendsBlock()
       await refreshFriendBadge()
+      await refreshNotifications()
     } catch (e) {
       setFriendErr(e instanceof Error ? e.message : 'Could not decline.')
     } finally {
@@ -267,6 +275,7 @@ export function SocialPage() {
     try {
       await unfriend(profileId, friend.friendProfileId)
       await loadFriendsBlock()
+      await refreshNotifications()
       setFriendOk('Removed friend.')
     } catch (e) {
       setFriendErr(e instanceof Error ? e.message : 'Could not remove.')
@@ -313,13 +322,14 @@ export function SocialPage() {
 
   const submitGame = async () => {
     if (!profileId || !opponentPick) return
-    const b1 = Number(ballsMe)
-    const b2 = Number(ballsOpponent)
-    if (!Number.isInteger(b1) || !Number.isInteger(b2) || b1 < 0 || b1 > 15 || b2 < 0 || b2 > 15) {
+    const loserBalls = Number(loserBallsRemaining)
+    if (!Number.isInteger(loserBalls) || loserBalls < 0 || loserBalls > 15) {
       setGameErr('Balls remaining must be integers 0–15.')
       return
     }
     const winnerId = winnerIsMe ? profileId : opponentPick.id
+    const b1 = winnerIsMe ? 0 : loserBalls
+    const b2 = winnerIsMe ? loserBalls : 0
     setGameBusy(true)
     setGameErr('')
     try {
@@ -331,8 +341,10 @@ export function SocialPage() {
         playerTwoBallsRemaining: b2,
       })
       await loadH2h()
+      await refreshNotifications()
       setOpponentPick(null)
       setGameSearch('')
+      setLoserBallsRemaining('7')
     } catch (e) {
       setGameErr(e instanceof Error ? e.message : 'Could not save game.')
     } finally {
@@ -368,6 +380,7 @@ export function SocialPage() {
       setTagFriendId(null)
       setPostWinnerSelf(null)
       await loadFeed('reset')
+      await refreshNotifications()
     } catch (e) {
       setPostErr(e instanceof Error ? e.message : 'Could not post.')
     } finally {
@@ -415,6 +428,7 @@ export function SocialPage() {
       await sendFriendRequestByUsername(profileId, username)
       setFriendOk(`Request sent to ${username}.`)
       await loadFriendsBlock()
+      await refreshNotifications()
       await refreshFriendBadge()
     } catch (e) {
       setFriendErr(e instanceof Error ? e.message : 'Could not send request.')
@@ -497,10 +511,10 @@ export function SocialPage() {
           <AppHeaderNavIcons />
         </div>
       </div>
-      <p className="muted">Feed, friends, and head-to-head games.</p>
+      <p className="muted">Feed, friends, notifications, and head-to-head games.</p>
 
       <div className="socialTabs" role="tablist">
-        {(['feed', 'friends', 'games'] as const).map((key) => (
+        {(['feed', 'friends', 'notifications', 'games'] as const).map((key) => (
           <button
             key={key}
             type="button"
@@ -509,7 +523,19 @@ export function SocialPage() {
             className={`socialTabs__btn${tab === key ? ' socialTabs__btn--active' : ''}`}
             onClick={() => setTab(key)}
           >
-            {key === 'feed' ? 'Feed' : key === 'friends' ? 'Friends' : 'Games'}
+            {key === 'feed' ? (
+              'Feed'
+            ) : key === 'friends' ? (
+              'Friends'
+            ) : key === 'games' ? (
+              'Games'
+            ) : (
+              <span className="socialTabs__bellWrap">
+                <BellGlyph />
+                <span>Notifications</span>
+                {hasUnreadNotifications && tab !== 'notifications' ? <span className="socialTabs__bellDot" aria-hidden="true" /> : null}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -567,7 +593,14 @@ export function SocialPage() {
                   <div className="socialCardRow socialCardRow--spread">
                     <div className="socialCardRow">
                       <Avatar userId={s.profileId} size={40} username={s.username} />
-                      <strong>{s.username}</strong>
+                      <strong>
+                        <Link
+                          className="socialProfileLink"
+                          to={`/profile/${encodeURIComponent(s.profileId)}?username=${encodeURIComponent(s.username)}`}
+                        >
+                          {s.username}
+                        </Link>
+                      </strong>
                     </div>
                     <button
                       type="button"
@@ -590,7 +623,14 @@ export function SocialPage() {
                 <div key={r.id} className="socialCard">
                   <div className="socialCardRow">
                     <Avatar userId={r.requesterProfileId} size={40} username={r.requesterUsername} />
-                    <strong>{r.requesterUsername}</strong>
+                    <strong>
+                      <Link
+                        className="socialProfileLink"
+                        to={`/profile/${encodeURIComponent(r.requesterProfileId)}?username=${encodeURIComponent(r.requesterUsername)}`}
+                      >
+                        {r.requesterUsername}
+                      </Link>
+                    </strong>
                   </div>
                   <div className="socialRowInput">
                     <button type="button" className="btn btn--primary" onClick={() => void onAccept(r.id)} disabled={friendBusy}>
@@ -613,7 +653,14 @@ export function SocialPage() {
                 <div key={r.id} className="socialCard">
                   <div className="socialCardRow">
                     <Avatar userId={r.recipientProfileId} size={40} username={r.recipientUsername} />
-                    <strong>{r.recipientUsername}</strong>
+                    <strong>
+                      <Link
+                        className="socialProfileLink"
+                        to={`/profile/${encodeURIComponent(r.recipientProfileId)}?username=${encodeURIComponent(r.recipientUsername)}`}
+                      >
+                        {r.recipientUsername}
+                      </Link>
+                    </strong>
                     <span className="socialPendingBadge">Pending</span>
                   </div>
                 </div>
@@ -653,27 +700,37 @@ export function SocialPage() {
               Find
             </button>
           </div>
-          {opponentPick ? <p className="muted">Opponent: {opponentPick.username}</p> : null}
-          <div className="socialRowInput">
-            <button type="button" className={`btn${winnerIsMe ? ' btn--primary' : ' btn--soft'}`} onClick={() => setWinnerIsMe(true)}>
-              You win
-            </button>
-            <button
-              type="button"
-              className={`btn${!winnerIsMe ? ' btn--primary' : ' btn--soft'}`}
-              onClick={() => setWinnerIsMe(false)}
-              disabled={!opponentPick}
+          <div className="socialWinnerSliderWrap">
+            <div
+              className={`modeSlider socialWinnerSlider ${!opponentPick ? 'modeSlider--disabled' : ''}`}
+              style={{ '--slider-index': winnerIsMe ? 0 : 1 } as CSSProperties}
             >
-              Opponent wins
-            </button>
+              <div className="modeSlider__thumb" aria-hidden="true" />
+              <button
+                type="button"
+                className={`modeSlider__btn ${winnerIsMe ? 'modeSlider__btn--active' : ''}`}
+                onClick={() => setWinnerIsMe(true)}
+              >
+                {(profile?.username ?? 'You').trim() || 'You'} Wins
+              </button>
+              <button
+                type="button"
+                className={`modeSlider__btn ${!winnerIsMe ? 'modeSlider__btn--active' : ''}`}
+                onClick={() => setWinnerIsMe(false)}
+                disabled={!opponentPick}
+              >
+                {(opponentPick?.username ?? 'Opponent').trim() || 'Opponent'} Wins
+              </button>
+            </div>
           </div>
           <label className="field">
-            Your balls left (0–15)
-            <input className="fieldInput" value={ballsMe} onChange={(e) => setBallsMe(e.target.value)} inputMode="numeric" />
-          </label>
-          <label className="field">
-            Their balls left (0–15)
-            <input className="fieldInput" value={ballsOpponent} onChange={(e) => setBallsOpponent(e.target.value)} inputMode="numeric" />
+            Losers Remaining Balls
+            <input
+              className="fieldInput"
+              value={loserBallsRemaining}
+              onChange={(e) => setLoserBallsRemaining(e.target.value)}
+              inputMode="numeric"
+            />
           </label>
           {gameErr ? <p className="error">{gameErr}</p> : null}
           <button type="button" className="btn btn--go" onClick={() => void submitGame()} disabled={gameBusy || !opponentPick}>
@@ -694,6 +751,47 @@ export function SocialPage() {
               <H2hRowWeb key={row.id} row={row} viewerId={profileId!} names={nameById} />
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {tab === 'notifications' ? (
+        <section className="socialSection card card--pool stack">
+          <div className="socialNotificationsHeader">
+            <div className="socialNotificationsTitle">
+              <BellGlyph />
+              <h2>Notifications</h2>
+            </div>
+            <button type="button" className="btn btn--soft btn--small" onClick={() => void refreshNotifications()}>
+              Refresh
+            </button>
+          </div>
+          {!notifications.length ? (
+            <p className="muted">No social notifications yet.</p>
+          ) : (
+            <div className="socialNotificationsList">
+              {notifications.map((item) => (
+                <article key={item.id} className={`socialNotificationCard socialNotificationCard--${item.type}`}>
+                  <div className="socialNotificationIcon" aria-hidden="true">
+                    {item.type === 'friend_request' ? '+' : item.type === 'post' ? '#' : 'vs'}
+                  </div>
+                  <div className="socialNotificationBody">
+                    <div className="socialNotificationHead">
+                      <strong>{item.title}</strong>
+                      <time className="muted" dateTime={item.createdAt}>
+                        {new Date(item.createdAt).toLocaleString()}
+                      </time>
+                    </div>
+                    <p>{item.body}</p>
+                    {item.href ? (
+                      <Link className="socialProfileLink socialNotificationLink" to={item.href}>
+                        Open
+                      </Link>
+                    ) : null}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       ) : null}
 
@@ -783,13 +881,22 @@ function FeedCard({ post, names }: { post: FeedPostRow; names: Record<string, st
         <Avatar userId={post.poster_profile_id} size={40} username={posterName} />
         <div>
           <div className="socialNameRow">
-            <strong>{posterName}</strong>
+            <strong>
+              <Link
+                className="socialProfileLink"
+                to={`/profile/${encodeURIComponent(post.poster_profile_id)}?username=${encodeURIComponent(posterName)}`}
+              >
+                {posterName}
+              </Link>
+            </strong>
             {post.winner_profile_id === post.poster_profile_id ? <span title="Winner">🏆</span> : null}
           </div>
           {oppName && oppId ? (
             <div className="socialNameRow">
               <Avatar userId={oppId} size={28} username={oppName} />
-              <span>{oppName}</span>
+              <Link className="socialProfileLink" to={`/profile/${encodeURIComponent(oppId)}?username=${encodeURIComponent(oppName)}`}>
+                {oppName}
+              </Link>
               {post.winner_profile_id === oppId ? <span title="Winner">🏆</span> : null}
             </div>
           ) : null}
@@ -804,6 +911,17 @@ function FeedCard({ post, names }: { post: FeedPostRow; names: Record<string, st
         {new Date(post.created_at).toLocaleString()}
       </time>
     </article>
+  )
+}
+
+function BellGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="socialBellIcon">
+      <path
+        d="M12 3a4 4 0 0 0-4 4v1.1c0 1.5-.5 3-1.5 4.2L5 14.2V16h14v-1.8l-1.5-1.9A7 7 0 0 1 16 8.1V7a4 4 0 0 0-4-4Zm0 18a2.7 2.7 0 0 0 2.5-1.7h-5A2.7 2.7 0 0 0 12 21Z"
+        fill="currentColor"
+      />
+    </svg>
   )
 }
 
@@ -833,7 +951,14 @@ function FriendRowWeb({
       <div className="socialCardRow">
         <Avatar userId={friend.friendProfileId} size={44} username={friend.friendUsername} />
         <div>
-          <strong>{friend.friendUsername}</strong>
+          <strong>
+            <Link
+              className="socialProfileLink"
+              to={`/profile/${encodeURIComponent(friend.friendProfileId)}?username=${encodeURIComponent(friend.friendUsername)}`}
+            >
+              {friend.friendUsername}
+            </Link>
+          </strong>
           <div className="muted">{rivalry}</div>
         </div>
       </div>

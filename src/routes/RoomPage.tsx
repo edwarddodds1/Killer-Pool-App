@@ -768,8 +768,12 @@ export function RoomPage() {
     const survivors = room.players.filter((player) => !player.eliminated)
     return [...survivors, ...eliminatedReverse]
   })()
-  const showPreGameModeLabel = room.status === 'lobby' || room.status === 'allocation' || room.status === 'order'
+  const showPreGameModeLabel =
+    room.mode === 'killer' &&
+    (room.status === 'lobby' || room.status === 'allocation' || room.status === 'order' || room.status === 'inGame')
   const modeAllocationLabel = room.killerAllocationMode === 'multi' ? 'Multi ball' : 'Single ball'
+  const showHeaderNavIcons = room.status === 'results'
+  const showHeaderEyeToggle = room.mode === 'killer' && room.status !== 'results' && me.assignedBalls.length > 0
 
   const breakerPlayer = room.playOrder.length
     ? room.players.find((player) => player.id === room.playOrder[0])?.username
@@ -810,10 +814,15 @@ export function RoomPage() {
             <div>
               <strong>{me.username}</strong>
               {room.status === 'lobby' ? <p>Code: {room.code}</p> : null}
-              {showPreGameModeLabel ? <p className="headerMetaLabel">{modeAllocationLabel}</p> : null}
+              {showPreGameModeLabel ? (
+                <div className="headerMetaRow">
+                  <p className="headerMetaLabel">{modeAllocationLabel}</p>
+                  <RulesHelpIconButton onPress={() => setShowRules(true)} label="Room mode rules" />
+                </div>
+              ) : null}
             </div>
           </div>
-        {me.assignedBalls.length > 0 ? (
+        {showHeaderEyeToggle ? (
           room.mode === 'killer' ? (
             <div className="headerBallIndicatorWrap">
               <button
@@ -852,7 +861,15 @@ export function RoomPage() {
               ))}
             </div>
           )
-        ) : room.status !== 'inGame' ? (
+        ) : me.assignedBalls.length > 0 ? (
+          room.mode === 'killer' ? null : (
+            <div className="headerBallIndicator">
+              {sortBallsAsc(me.assignedBalls).map((ball) => (
+                <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
+              ))}
+            </div>
+          )
+        ) : room.status !== 'inGame' && room.status !== 'results' ? (
           <button
             className={`btn btn--small ${inviteCopied ? 'btn--copied' : ''}`}
             onClick={copyInviteLink}
@@ -862,10 +879,11 @@ export function RoomPage() {
           </button>
         ) : null}
         </div>
-        <div className="header__tools">
-          <RulesHelpIconButton onPress={() => setShowRules(true)} label="Room mode rules" />
-          <AppHeaderNavIcons />
-        </div>
+        {showHeaderNavIcons ? (
+          <div className="header__tools">
+            <AppHeaderNavIcons />
+          </div>
+        ) : null}
       </header>
       {isLateJoinLocked ? (
         <section className="card">
