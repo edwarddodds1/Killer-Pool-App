@@ -511,7 +511,6 @@ export function SocialPage() {
           <AppHeaderNavIcons />
         </div>
       </div>
-      <p className="muted">Feed, friends, notifications, and head-to-head games.</p>
 
       <div className="socialTabs" role="tablist">
         {(['feed', 'friends', 'notifications', 'games'] as const).map((key) => (
@@ -519,6 +518,7 @@ export function SocialPage() {
             key={key}
             type="button"
             role="tab"
+            data-tab={key}
             aria-selected={tab === key}
             className={`socialTabs__btn${tab === key ? ' socialTabs__btn--active' : ''}`}
             onClick={() => setTab(key)}

@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Button, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAppState } from '../state/AppProviders';
 import { addTimerScore } from '../services/store';
 import type { RootStackParamList } from '../types/navigation';
+import { RulesHelpHeaderButton, RulesModal } from '../components/ui/RulesModal';
 
 const MIN_VALID_TIMER_RUN_MS = 20000;
 
@@ -14,6 +15,13 @@ export function TimerScreen({ navigation }: Props): React.JSX.Element {
   const { profile } = useAppState();
   const [runningSince, setRunningSince] = useState<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [showRules, setShowRules] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <RulesHelpHeaderButton onPress={() => setShowRules(true)} />,
+    });
+  }, [navigation]);
 
   useEffect(() => {
     if (runningSince === null) return;
@@ -52,6 +60,7 @@ export function TimerScreen({ navigation }: Props): React.JSX.Element {
         <Button title="Stop" color="#C64141" onPress={() => setRunningSince(null)} />
       )}
       <Button title="Finish" onPress={() => void finish()} />
+      <RulesModal visible={showRules} onClose={() => setShowRules(false)} gameMode="timer" />
     </View>
   );
 }

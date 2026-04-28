@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useState } from 'react';
 import { Button, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -6,6 +6,7 @@ import { useAppState } from '../state/AppProviders';
 import { buildNewRoom } from '../services/game';
 import { getRoomRemote, getRooms, upsertRoom, upsertRoomRemote } from '../services/store';
 import type { RootStackParamList } from '../types/navigation';
+import { RulesHelpHeaderButton, RulesModal } from '../components/ui/RulesModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -13,6 +14,13 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
   const { profile, setProfile, hydrated, signOut } = useAppState();
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
+  const [showRules, setShowRules] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <RulesHelpHeaderButton onPress={() => setShowRules(true)} />,
+    });
+  }, [navigation]);
 
   if (!hydrated) {
     return <View style={styles.container}><Text style={styles.text}>Loading...</Text></View>;
@@ -73,6 +81,7 @@ export function HomeScreen({ navigation }: Props): React.JSX.Element {
           </View>
         </>
       )}
+      <RulesModal visible={showRules} onClose={() => setShowRules(false)} gameMode="killer" />
     </View>
   );
 }

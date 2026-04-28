@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,10 +8,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 import type { TimerScore } from '../types/domain';
 import { deleteTimerScore, getTimerScores } from '../services/store';
 import { useAppState } from '../state/AppProviders';
+import { RulesHelpHeaderButton, RulesModal } from '../components/ui/RulesModal';
 import {
   formatRecentRunDayMonth,
   formatTimerElapsedMs,
@@ -20,10 +22,18 @@ import {
 } from '../../../shared/timerLeaderboard';
 
 export function LeaderboardScreen(): React.JSX.Element {
+  const navigation = useNavigation();
   const { profile, hydrated } = useAppState();
   const [scores, setScores] = useState<TimerScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingKey, setDeletingKey] = useState<string | null>(null);
+  const [showRules, setShowRules] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <RulesHelpHeaderButton onPress={() => setShowRules(true)} />,
+    });
+  }, [navigation]);
 
   const loadScores = useCallback(async () => {
     setLoading(true);
@@ -180,6 +190,7 @@ export function LeaderboardScreen(): React.JSX.Element {
           <Text style={styles.muted}>Leaderboard is empty.</Text>
         )}
       </View>
+      <RulesModal visible={showRules} onClose={() => setShowRules(false)} gameMode="oneVone" />
     </ScrollView>
   );
 }

@@ -332,16 +332,6 @@ export function TimerPoolPage() {
             ) : null}
           </div>
         </div>
-        <section className="timerRules" aria-label="Timer rules">
-          <h2 className="timerRules__title">Rules</h2>
-          <ul className="timerRules__list">
-            <li>Pot all balls as quick as possible.</li>
-            <li>All balls must be stationary between shots.</li>
-            <li>Potting the white is a restart from the line.</li>
-            <li>Touching a ball to your advantage incurs a 10-second time penalty.</li>
-            <li>The white ball going off the table incurs a 10-second time penalty.</li>
-          </ul>
-        </section>
         {error ? <p className="error">{error}</p> : null}
       </section>
       <RulesModal visible={showRules} onClose={() => setShowRules(false)} gameMode="timer" />

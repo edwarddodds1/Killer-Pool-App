@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { Button, FlatList, StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -6,12 +6,20 @@ import { allocateBalls } from '../services/game';
 import { getRoom, getRoomRemote, upsertRoom, upsertRoomRemote } from '../services/store';
 import type { RootStackParamList } from '../types/navigation';
 import type { RoomState } from '../types/domain';
+import { RulesHelpHeaderButton, RulesModal } from '../components/ui/RulesModal';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Room'>;
 
-export function RoomScreen({ route }: Props): React.JSX.Element {
+export function RoomScreen({ route, navigation }: Props): React.JSX.Element {
   const [room, setRoom] = useState<RoomState | null>(null);
+  const [showRules, setShowRules] = useState(false);
   const code = route.params.code;
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <RulesHelpHeaderButton onPress={() => setShowRules(true)} />,
+    });
+  }, [navigation]);
+
 
   useEffect(() => {
     (async () => {
@@ -46,9 +54,12 @@ export function RoomScreen({ route }: Props): React.JSX.Element {
     return (
       <View style={styles.container}>
         <Text style={styles.text}>Room not found.</Text>
+        <RulesModal visible={showRules} onClose={() => setShowRules(false)} gameMode="killer" />
       </View>
     );
   }
+
+  const rulesMode = room.killerAllocationMode === 'multi' ? 'multiball' : 'killer';
 
   return (
     <View style={styles.container}>
@@ -66,6 +77,7 @@ export function RoomScreen({ route }: Props): React.JSX.Element {
           </View>
         )}
       />
+      <RulesModal visible={showRules} onClose={() => setShowRules(false)} gameMode={rulesMode} />
     </View>
   );
 }
