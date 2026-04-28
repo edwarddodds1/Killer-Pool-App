@@ -1077,10 +1077,14 @@ export function ProfilePage() {
                     </button>
                   </div>
                 ) : null}
-                {friendMsg ? <p className="muted profileFriendMsg">{friendMsg}</p> : null}
-                <p className="muted profileFriendHint">
-                  Open <Link to="/social">Social</Link> for feed, requests, and 1v1 games.
-                </p>
+                {socialRel !== 'pending_out' ? (
+                  <>
+                    {friendMsg ? <p className="muted profileFriendMsg">{friendMsg}</p> : null}
+                    <p className="muted profileFriendHint">
+                      Open <Link to="/social">Social</Link> for feed, requests, and 1v1 games.
+                    </p>
+                  </>
+                ) : null}
               </>
             )}
           </div>

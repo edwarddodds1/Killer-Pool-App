@@ -221,7 +221,7 @@ body { margin: 0; background: var(--bg); }
   }
   .rulesModalPanel {
     gap: 10px;
-    padding: 18px 18px 20px;
+    padding: 20px 22px 22px;
   }
   .rulesModalHeader {
     gap: 10px;
@@ -237,7 +237,7 @@ body { margin: 0; background: var(--bg); }
     font-size: 1.2rem;
   }
   .rulesModalList {
-    padding-left: 1rem;
+    padding-left: 1.35rem;
     gap: 7px;
   }
   .rulesModalListItem {
@@ -366,12 +366,8 @@ body { margin: 0; background: var(--bg); }
   place-items: unset;
 }
 .brand.homeHero.pageHeadingRow .pageHeadingRow__tools {
-  align-self: start;
-  padding-top: 10px;
-}
-.brand.homeHero.pageHeadingRow .appHeaderNavIcons {
-  position: absolute;
-  top: 15px;
+  align-self: center;
+  padding-top: 0;
 }
 .homeHero {
   position: relative;
@@ -426,7 +422,7 @@ h2 { font-size: 1.2rem; }
 .homeTimerRankBubble {
   display: inline-flex;
   flex-wrap: nowrap;
-  align-items: baseline;
+  align-items: center;
   gap: 6px 8px;
   max-width: 100%;
   padding: 4px 10px;
@@ -436,6 +432,7 @@ h2 { font-size: 1.2rem; }
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
   width: fit-content;
   margin-top: 2px;
+  white-space: nowrap;
 }
 .homeTimerRankBubble__label {
   font-size: 0.62rem;
@@ -444,6 +441,7 @@ h2 { font-size: 1.2rem; }
   text-transform: none;
   color: #2a2a2a;
   line-height: 1;
+  white-space: nowrap;
 }
 .homeTimerRankBubble__value {
   font-size: 0.75rem;
@@ -2451,6 +2449,12 @@ input, select, .btn {
   }
   .homeTimerRankBubble__value {
     font-size: 0.68rem;
+  }
+  .profileTitleRow.pageHeadingRow {
+    --app-header-nav-track: 120px;
+  }
+  .profileTitle {
+    font-size: clamp(1.55rem, 6vw + 0.2rem, 2.2rem);
   }
   .profileStatsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
