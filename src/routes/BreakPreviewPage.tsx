@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
 import { AVATAR_ICONS } from '../constants/avatarIcons'
 
 type Phase = 'lineup' | 'flipDown' | 'stackCenter' | 'shufflePile' | 'dealOut' | 'flipUp' | 'done'
@@ -304,7 +304,6 @@ function CardShufflePreview({
 }
 
 export function BreakPreviewPage() {
-  const navigate = useNavigate()
   const initialTuning = useMemo(() => readPreviewTuning(), [])
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000))
   const [playerCount, setPlayerCount] = useState(initialTuning.playerCount)
@@ -348,14 +347,12 @@ export function BreakPreviewPage() {
   return (
     <main className="page">
       <section className="card">
-        <div className="header">
-          <div>
-            <h1>Card Shuffle Tuner</h1>
+        <div className="header pageHeadingRow breakPreviewHeadingRow">
+          <div className="pageHeadingRow__start breakPreviewHeadingRow__text">
+            <h1 className="pageHeadingRow__title">Card Shuffle Tuner</h1>
             <p className="muted">Polish the exact break/order card sequence.</p>
           </div>
-          <button className="btn btn--small" onClick={() => navigate('/')}>
-            Back
-          </button>
+          <AppHeaderNavIcons />
         </div>
         <div className="header">
           <small className="muted">Seed: {seed}</small>

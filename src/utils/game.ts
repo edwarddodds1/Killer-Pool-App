@@ -180,3 +180,12 @@ export function removePlayerFromRoom(room: RoomState, playerId: string): RoomSta
     turnIndex: nextTurnIndex,
   }
 }
+
+/**
+ * Killer elimination win/loss stats apply only to human-only games (no bots).
+ * Keep behavior aligned with `killerPoolRoomCountsTowardPlayerStats` in `packages/domain`.
+ */
+export function killerPoolRoomCountsTowardPlayerStats(room: Pick<RoomState, 'mode' | 'players'>): boolean {
+  if (room.mode !== 'killer') return false
+  return !room.players.some((p) => Boolean(p.isBot))
+}

@@ -98,6 +98,10 @@ export function getKillerPoolStats(profileId: string) {
   }
 }
 
+/**
+ * Local killer-mode stats only. Callers must not invoke this for rooms that include a bot
+ * (`killerPoolRoomCountsTowardPlayerStats` in `utils/game`); bot matches never increment stats.
+ */
 export function recordKillerPoolMatchResult(profileId: string, didWin: boolean) {
   const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
   let baseline = all[profileId]
@@ -113,8 +117,58 @@ export function recordKillerPoolMatchResult(profileId: string, didWin: boolean) 
   saveJson(KILLER_POOL_STATS_KEY, all)
 }
 
+/** Clears this profile's killer W/L counters (v2 + legacy v1) on this device only. */
+export function clearKillerPoolStatsForProfile(profileId: string) {
+  if (!profileId) return
+  const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
+  delete all[profileId]
+  saveJson(KILLER_POOL_STATS_KEY, all)
+  const legacy = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_LEGACY_KEY, {})
+  if (legacy[profileId]) {
+    delete legacy[profileId]
+    saveJson(KILLER_POOL_STATS_LEGACY_KEY, legacy)
+  }
+}
+
+const FRIEND_CHALLENGE_STATS_KEY = 'killer_pool_friend_challenge_stats_v1'
+type FriendChallengeStats = { wins: number; losses: number; for: number; against: number; games: number }
+type FriendChallengeStatsIndex = Record<string, FriendChallengeStats>
+type FriendChallengeStatsByOwner = Record<string, FriendChallengeStatsIndex>
+
+/** Local-only killer challenge stats vs a friend (same key as mobile). */
+export function getFriendChallengeStats(ownerProfileId: string, friendProfileId: string): FriendChallengeStats {
+  const all = loadJson<FriendChallengeStatsByOwner>(FRIEND_CHALLENGE_STATS_KEY, {})
+  const ownerStats = all[ownerProfileId] ?? {}
+  const stats = ownerStats[friendProfileId]
+  if (!stats) {
+    return { wins: 0, losses: 0, for: 0, against: 0, games: 0 }
+  }
+  return {
+    wins: Math.max(0, stats.wins || 0),
+    losses: Math.max(0, stats.losses || 0),
+    for: Math.max(0, stats.for || 0),
+    against: Math.max(0, stats.against || 0),
+    games: Math.max(0, stats.games || 0),
+  }
+}
+
 export function getProfile() {
   return loadJson<Profile | null>(PROFILE_KEY, null)
+}
+
+/**
+ * If the device has a profile id but no `sessionId` (e.g. older builds or cleared field),
+ * restore `sessionId` from `user_accounts.active_session_id` so Social and the session
+ * watcher match the server. Guests (random ids with no account row) get no update.
+ */
+export async function hydrateProfileSessionFromServer(): Promise<boolean> {
+  if (!supabase) return false
+  const p = getProfile()
+  if (!p?.id || p.sessionId) return false
+  const remote = await fetchActiveSessionIdForProfile(p.id)
+  if (remote === undefined || remote === null) return false
+  saveProfile({ ...p, sessionId: remote })
+  return true
 }
 
 export function saveProfile(profile: Profile) {

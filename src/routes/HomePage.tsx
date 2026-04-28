@@ -3,6 +3,7 @@ import type { CSSProperties, FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { GameMode, KillerAllocationMode } from '../types'
 import { buildNewRoom, createRandomCode } from '../utils/game'
+import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
 import {
   clearProfile,
   getProfile,
@@ -10,6 +11,7 @@ import {
   getRooms,
   flushPendingTimerScores,
   getTimerScores,
+  hydrateProfileSessionFromServer,
   registerAccount,
   timerScoreBelongsToProfile,
   saveProfile,
@@ -30,6 +32,12 @@ export function HomePage() {
   const [error, setError] = useState('')
   const [timerRank, setTimerRank] = useState<number | null>(null)
   const canCreate = useMemo(() => Boolean(profile), [profile])
+
+  useEffect(() => {
+    void hydrateProfileSessionFromServer().then(() => {
+      setProfile(getProfile())
+    })
+  }, [])
 
   useEffect(() => {
     const loadTimerRank = async () => {
@@ -125,25 +133,33 @@ export function HomePage() {
 
   return (
     <main className="page homePage">
-      <header className="brand homeHero">
-        <div className="brand__logo" aria-hidden="true">
-          <svg viewBox="0 0 100 100" className="brand__logoSvg">
-            <circle cx="50" cy="50" r="48" fill="#000" />
-            <circle cx="50" cy="50" r="24" fill="#ececec" />
-            <path
-              d="M41.2 35.8h4.8v12.4l10.3-12.4h6.4L50.8 50l12.2 14.3h-6.4L46 51.9v12.4h-4.8V35.8Z"
-              fill="#000"
-            />
-          </svg>
+      <header className="brand homeHero pageHeadingRow">
+        <div className="homeHero__main">
+          <div className="brand__logo" aria-hidden="true">
+            <svg viewBox="0 0 100 100" className="brand__logoSvg">
+              <circle cx="50" cy="50" r="48" fill="#000" />
+              <circle cx="50" cy="50" r="24" fill="#ececec" />
+              <path
+                d="M41.2 35.8h4.8v12.4l10.3-12.4h6.4L50.8 50l12.2 14.3h-6.4L46 51.9v12.4h-4.8V35.8Z"
+                fill="#000"
+              />
+            </svg>
+          </div>
+          <div className="homeTitleBlock">
+            <h1 className="pageHeadingRow__title">KILLER POOL</h1>
+            {timerRank != null ? (
+              <div
+                className="homeTimerRankBubble"
+                aria-label={`Timer : number ${timerRank} ranked player`}
+              >
+                <span className="homeTimerRankBubble__label">Timer :</span>
+                <span className="homeTimerRankBubble__value">#{timerRank} ranked player</span>
+              </div>
+            ) : null}
+          </div>
         </div>
-        <div className="homeTitleBlock">
-          <h1>KILLER POOL</h1>
-          {timerRank != null ? (
-            <div className="homeTimerRankBubble" aria-label="Your timer leaderboard rank">
-              <span className="homeTimerRankBubble__label">Timer pool</span>
-              <span className="homeTimerRankBubble__value">#{timerRank} ranked player</span>
-            </div>
-          ) : null}
+        <div className="pageHeadingRow__tools">
+          <AppHeaderNavIcons />
         </div>
       </header>
       <section className="card card--pool homeCard">
@@ -302,6 +318,11 @@ export function HomePage() {
               </svg>
             </button>
             <strong>{profile.username}</strong>
+            {!profile.sessionId ? (
+              <span className="homeSessionFooter__guestBadge" title="Guest — sign in or create an account for Social and cloud saves">
+                Guest
+              </span>
+            ) : null}
           </span>
           <span className="homeSessionFooter__actions">
             <button type="button" className="homeSessionFooter__signOut" onClick={onSignOut}>

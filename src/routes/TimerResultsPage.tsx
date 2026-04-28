@@ -1,5 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { Avatar } from '../components/social/Avatar'
 import type { TimerScore } from '../types'
 import {
   formatTimerElapsedMs,
@@ -86,6 +88,12 @@ function TimerDeleteIconButton({
       )}
     </button>
   )
+}
+
+function leaderboardAvatarId(score: Pick<TimerScore, 'profileId' | 'username'>) {
+  const pid = score.profileId?.trim()
+  if (pid) return pid
+  return `anon:${score.username.trim().toLowerCase()}`
 }
 
 export function TimerResultsPage() {
@@ -240,30 +248,16 @@ export function TimerResultsPage() {
 
   return (
     <main className="page timerResultsPage">
-      <div className="timerResultsTitleRow">
-        <div className="timerResultsTitleLeft">
-          <h1 className="timerResultsTitle">Leaderboard</h1>
+      <div className="timerResultsTitleRow pageHeadingRow">
+        <div className="timerResultsTitleLeft pageHeadingRow__start">
+          <h1 className="timerResultsTitle pageHeadingRow__title">Leaderboard</h1>
           {isAdmin ? (
             <span className="adminModeIcon" aria-label="Admin mode active" title="Admin mode active">
               👥
             </span>
           ) : null}
         </div>
-        <div className="timerTitleActions">
-          <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/profile')} aria-label="Profile">
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Zm0 2.3c-3.9 0-7.2 2.1-8.3 5.2-.2.6.2 1.3.9 1.3h14.8c.7 0 1.1-.7.9-1.3-1.1-3.1-4.4-5.2-8.3-5.2Z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-          <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
+        <AppHeaderNavIcons />
       </div>
       <section className="card card--pool timerResultsCard">
         <div className="timerResultsGrid">
@@ -406,7 +400,10 @@ export function TimerResultsPage() {
                       }}
                     >
                       <span>#{index + 1}</span>
-                      <span className="timerRowUser">{score.username}</span>
+                      <div className="timerRowLeaderUser">
+                        <Avatar userId={leaderboardAvatarId(score)} size={32} username={score.username} />
+                        <span className="timerRowUser">{score.username}</span>
+                      </div>
                       <div className="timerRowActions">
                         {isFresh ? <span className="timerFreshBadge">NEW</span> : null}
                         <strong>{formatTimerElapsedMs(score.elapsedMs)}</strong>
@@ -448,7 +445,10 @@ export function TimerResultsPage() {
                   }}
                 >
                   <span>#{index + 1}</span>
-                  <span className="timerRowUser">{entry.username}</span>
+                  <div className="timerRowLeaderUser">
+                    <Avatar userId={leaderboardAvatarId(entry)} size={32} username={entry.username} />
+                    <span className="timerRowUser">{entry.username}</span>
+                  </div>
                   <div className="timerRowActions">
                     <small>{entry.runs} {entry.runs === 1 ? 'run' : 'runs'}</small>
                     <strong>{formatTimerElapsedMs(entry.averageMs)}</strong>

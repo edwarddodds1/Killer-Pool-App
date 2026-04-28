@@ -1,11 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { RulesHelpIconButton, RulesModal } from '../components/ui/RulesModal'
 import { AVATAR_ICONS } from '../constants/avatarIcons'
 import { AvatarBadge } from '../components/AvatarBadge'
 import { BallIcon } from '../components/BallIcon'
 import type { PlayerState, RoomState } from '../types'
-import { activePlayer, allocateBalls, pickPlayerByBall, shuffle } from '../utils/game'
+import {
+  activePlayer,
+  allocateBalls,
+  killerPoolRoomCountsTowardPlayerStats,
+  pickPlayerByBall,
+  shuffle,
+} from '../utils/game'
 import {
   getProfile,
   recordKillerPoolMatchResult,
@@ -155,6 +163,10 @@ function readShuffleTuning() {
   }
 }
 
+function wallClockMs() {
+  return Date.now()
+}
+
 export function RoomPage() {
   const { code = '' } = useParams()
   const navigate = useNavigate()
@@ -171,6 +183,7 @@ export function RoomPage() {
   const [inviteCopied, setInviteCopied] = useState(false)
   const [showHeaderBalls, setShowHeaderBalls] = useState(false)
   const [pendingReadyState, setPendingReadyState] = useState<{ value: boolean; setAt: number } | null>(null)
+  const [showRules, setShowRules] = useState(false)
   const orderTimeoutsRef = useRef<number[]>([])
   const orderIntervalRef = useRef<number | null>(null)
   const orderAnimKeyRef = useRef('')
@@ -328,7 +341,7 @@ export function RoomPage() {
     if (!room || room.mode !== 'killer' || room.status !== 'results') return
     const gameKey = `${room.code}:${room.gameNumber}`
     if (recordedResultKeysRef.current.has(gameKey)) return
-    if (room.players.some((player) => player.isBot)) {
+    if (!killerPoolRoomCountsTowardPlayerStats(room)) {
       recordedResultKeysRef.current.add(gameKey)
       return
     }
@@ -515,7 +528,7 @@ export function RoomPage() {
   const toggleReady = () => {
     if (isLateJoinLocked) return
     const nextReady = !meEffectiveReady
-    setPendingReadyState({ value: nextReady, setAt: Date.now() })
+    setPendingReadyState({ value: nextReady, setAt: wallClockMs() })
     applyRoomUpdate((current) => ({
       ...current,
       players: current.players.map((player) =>
@@ -791,14 +804,15 @@ export function RoomPage() {
   return (
     <main className="page">
       <header className="card header">
-        <div className="header__left">
-          <AvatarBadge username={me.username} avatarIcon={me.avatarIcon} />
-          <div>
-            <strong>{me.username}</strong>
-            {room.status === 'lobby' ? <p>Code: {room.code}</p> : null}
-            {showPreGameModeLabel ? <p className="headerMetaLabel">{modeAllocationLabel}</p> : null}
+        <div className="headerMain">
+          <div className="header__left">
+            <AvatarBadge username={me.username} avatarIcon={me.avatarIcon} />
+            <div>
+              <strong>{me.username}</strong>
+              {room.status === 'lobby' ? <p>Code: {room.code}</p> : null}
+              {showPreGameModeLabel ? <p className="headerMetaLabel">{modeAllocationLabel}</p> : null}
+            </div>
           </div>
-        </div>
         {me.assignedBalls.length > 0 ? (
           room.mode === 'killer' ? (
             <div className="headerBallIndicatorWrap">
@@ -847,6 +861,11 @@ export function RoomPage() {
             {inviteCopied ? '✓ Copied' : 'Copy invite link'}
           </button>
         ) : null}
+        </div>
+        <div className="header__tools">
+          <RulesHelpIconButton onPress={() => setShowRules(true)} label="Room mode rules" />
+          <AppHeaderNavIcons />
+        </div>
       </header>
       {isLateJoinLocked ? (
         <section className="card">
@@ -1011,6 +1030,8 @@ export function RoomPage() {
               <button
                 className="inGameUndoBtn"
                 onClick={undoLastAction}
+                // Ref length is only for disabling the button; stack is updated in event handlers.
+                // eslint-disable-next-line react-hooks/refs -- sync read for disabled state
                 disabled={isLateJoinLocked || inGameUndoRef.current.length === 0}
                 aria-label="Undo last action"
                 title="Undo"
@@ -1116,6 +1137,11 @@ export function RoomPage() {
       <button className="leaveGameBtn" onClick={() => navigate('/')}>
         Leave game
       </button>
+      <RulesModal
+        visible={showRules}
+        onClose={() => setShowRules(false)}
+        gameMode={room.killerAllocationMode === 'multi' ? 'multiball' : 'killer'}
+      />
     </main>
   )
 }

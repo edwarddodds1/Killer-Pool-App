@@ -1,11 +1,31 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { type ChangeEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { Avatar } from '../components/social/Avatar'
+import { H2hRowWeb } from '../components/social/H2hRowWeb'
+import { primeAvatarCache } from '../components/social/avatarCache'
+import { fetchUsernamesForProfileIds } from '../services/social/socialFeedService'
+import {
+  acceptFriendRequest,
+  fetchUsernameForProfileId,
+  getSocialRelationship,
+  sendFriendRequestByUsername,
+  unfriend,
+} from '../services/social/socialFriendshipService'
+import {
+  listHeadToHeadForPair,
+  listHeadToHeadForProfile,
+  summarizeHeadToHeadForViewer,
+  type HeadToHeadRow,
+} from '../services/social/socialHeadToHeadService'
+import { uploadProfileAvatar } from '../services/social/socialProfilePictureService'
 import type { TimerScore } from '../types'
 import { formatTimerElapsedMs, timerScoreBelongsToProfile, timerScoreKey } from '../../shared/timerLeaderboard'
 import {
   deleteCurrentAccount,
   findKnownUsernameForProfileId,
   flushPendingTimerScores,
+  clearKillerPoolStatsForProfile,
   getKillerPoolStats,
   getProfile,
   getTimerScores,
@@ -91,6 +111,17 @@ export function ProfilePage() {
   const [editingSeconds, setEditingSeconds] = useState('')
   const [selectedAttemptKey, setSelectedAttemptKey] = useState<string | null>(null)
   const [showFormInfo, setShowFormInfo] = useState(false)
+  const [h2hRows, setH2hRows] = useState<HeadToHeadRow[]>([])
+  const [h2hNames, setH2hNames] = useState<Record<string, string>>({})
+  const [socialRel, setSocialRel] = useState<
+    'loading' | 'none' | 'pending_out' | 'pending_in' | 'friends' | 'declined'
+  >('loading')
+  const [friendshipRowId, setFriendshipRowId] = useState<string | null>(null)
+  const [friendBusy, setFriendBusy] = useState(false)
+  const [friendMsg, setFriendMsg] = useState('')
+  const [avatarBusy, setAvatarBusy] = useState(false)
+  const [killerStatsEpoch, setKillerStatsEpoch] = useState(0)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
   const deferredScores = useDeferredValue(scores)
   const requestedUsername = (searchParams.get('username') ?? '').trim()
   const isAdmin = useMemo(() => {
@@ -182,9 +213,64 @@ export function ProfilePage() {
   const killerPoolStats = useMemo(() => {
     if (!killerPoolProfileId) return { wins: 0, games: 0 }
     return getKillerPoolStats(killerPoolProfileId)
-  }, [killerPoolProfileId])
+  }, [killerPoolProfileId, killerStatsEpoch])
   const killerWinRatioLabel = `${killerPoolStats.wins}/${killerPoolStats.games}`
   const killerWinPct = killerPoolStats.games > 0 ? Math.round((killerPoolStats.wins / killerPoolStats.games) * 100) : null
+
+  const h2hSummary = useMemo(() => {
+    if (!h2hRows.length) return null
+    const viewerId = viewingOwnProfile ? killerPoolProfileId : profile?.id
+    if (!viewerId) return null
+    return summarizeHeadToHeadForViewer(h2hRows, viewerId)
+  }, [h2hRows, killerPoolProfileId, profile?.id, viewingOwnProfile])
+
+  useEffect(() => {
+    if (!killerPoolProfileId || !profile?.id) {
+      setH2hRows([])
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      const rows = viewingOwnProfile
+        ? await listHeadToHeadForProfile(killerPoolProfileId, 20)
+        : await listHeadToHeadForPair(profile.id, killerPoolProfileId, 15)
+      if (cancelled) return
+      setH2hRows(rows)
+      const ids = new Set<string>()
+      for (const row of rows) {
+        ids.add(row.player_one_profile_id)
+        ids.add(row.player_two_profile_id)
+      }
+      const names = await fetchUsernamesForProfileIds([...ids])
+      if (!cancelled) setH2hNames((prev) => ({ ...prev, ...names }))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [killerPoolProfileId, profile?.id, viewingOwnProfile])
+
+  useEffect(() => {
+    if (!profile?.sessionId || !profile.id || !killerPoolProfileId || viewingOwnProfile) {
+      setSocialRel('none')
+      setFriendshipRowId(null)
+      return
+    }
+    let cancelled = false
+    setSocialRel('loading')
+    void getSocialRelationship(profile.id, killerPoolProfileId).then((r) => {
+      if (cancelled) return
+      if (r.relationship === 'none') setSocialRel('none')
+      else if (r.relationship === 'friends') setSocialRel('friends')
+      else if (r.relationship === 'pending_outgoing') setSocialRel('pending_out')
+      else if (r.relationship === 'pending_incoming') setSocialRel('pending_in')
+      else setSocialRel('declined')
+      setFriendshipRowId(r.rowId)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [profile?.id, profile?.sessionId, killerPoolProfileId, viewingOwnProfile])
+
   const timerRank = useMemo(() => {
     if (!bestRun) return null
     return deferredScores.filter((run) => run.elapsedMs < bestRun.elapsedMs).length + 1
@@ -376,6 +462,16 @@ export function ProfilePage() {
     return { ...slice, d }
   })
 
+  const onResetKillerPoolStats = () => {
+    if (!killerPoolProfileId || !viewingOwnProfile) return
+    const confirmed = window.confirm(
+      'Reset Killer mode wins and games to 0 on this browser? This only affects local stats and cannot be undone.',
+    )
+    if (!confirmed) return
+    clearKillerPoolStatsForProfile(killerPoolProfileId)
+    setKillerStatsEpoch((n) => n + 1)
+  }
+
   const onDeleteAccount = async () => {
     const confirmed = window.confirm('Delete your account? This removes your account credentials from this app.')
     if (!confirmed) return
@@ -385,6 +481,78 @@ export function ProfilePage() {
       navigate('/', { replace: true })
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Could not delete account.')
+    }
+  }
+
+  const refreshSocialRel = async () => {
+    if (!profile?.id || !killerPoolProfileId || viewingOwnProfile) return
+    const r = await getSocialRelationship(profile.id, killerPoolProfileId)
+    if (r.relationship === 'none') setSocialRel('none')
+    else if (r.relationship === 'friends') setSocialRel('friends')
+    else if (r.relationship === 'pending_outgoing') setSocialRel('pending_out')
+    else if (r.relationship === 'pending_incoming') setSocialRel('pending_in')
+    else setSocialRel('declined')
+    setFriendshipRowId(r.rowId)
+  }
+
+  const onAvatarFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file || !profile?.id || !profile.sessionId) return
+    setAvatarBusy(true)
+    setError('')
+    try {
+      const url = await uploadProfileAvatar({ profileId: profile.id, file })
+      primeAvatarCache(profile.id, url)
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Photo upload failed.')
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
+
+  const onAddFriendProfile = async () => {
+    if (!profile?.id || !killerPoolProfileId) return
+    setFriendBusy(true)
+    setFriendMsg('')
+    try {
+      const uname = await fetchUsernameForProfileId(killerPoolProfileId)
+      if (!uname) throw new Error('Could not resolve username for this profile.')
+      await sendFriendRequestByUsername(profile.id, uname)
+      await refreshSocialRel()
+      setFriendMsg('Friend request sent.')
+    } catch (e) {
+      setFriendMsg(e instanceof Error ? e.message : 'Could not send request.')
+    } finally {
+      setFriendBusy(false)
+    }
+  }
+
+  const onAcceptFriendProfile = async () => {
+    if (!profile?.id || !friendshipRowId) return
+    setFriendBusy(true)
+    try {
+      await acceptFriendRequest(profile.id, friendshipRowId)
+      await refreshSocialRel()
+      setFriendMsg('You are now friends.')
+    } catch (e) {
+      setFriendMsg(e instanceof Error ? e.message : 'Could not accept.')
+    } finally {
+      setFriendBusy(false)
+    }
+  }
+
+  const onUnfriendProfile = async () => {
+    if (!profile?.id || !killerPoolProfileId) return
+    setFriendBusy(true)
+    try {
+      await unfriend(profile.id, killerPoolProfileId)
+      await refreshSocialRel()
+      setFriendMsg('Unfriended.')
+    } catch (e) {
+      setFriendMsg(e instanceof Error ? e.message : 'Could not unfriend.')
+    } finally {
+      setFriendBusy(false)
     }
   }
 
@@ -486,56 +654,77 @@ export function ProfilePage() {
 
   return (
     <main className="page profilePage">
-      <div className="profileTitleRow">
-        <h1 className="profileTitle">{viewingOwnProfile ? 'Your Profile' : 'Player Profile'}</h1>
-        <div className="profileTitleActions">
-          <button
-            className="timerHomeBtn timerHomeBtn--small profileBackBtn"
-            type="button"
-            onClick={() => navigate(-1)}
-            aria-label="Back"
-          >
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M14.7 5.3a1 1 0 0 1 0 1.4L10.4 11H20a1 1 0 1 1 0 2h-9.6l4.3 4.3a1 1 0 0 1-1.4 1.4l-6-6a1 1 0 0 1 0-1.4l6-6a1 1 0 0 1 1.4 0Z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-          <button className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
+      <div className="profileTitleRow pageHeadingRow">
+        <h1 className="profileTitle pageHeadingRow__title">
+          {viewingOwnProfile ? 'Your Profile' : 'Player Profile'}
+        </h1>
+        <AppHeaderNavIcons />
       </div>
 
       <section className="card card--pool profileCard">
         <header className="profileCardHeader">
+          {killerPoolProfileId ? (
+            <div className="profileAvatarWrap">
+              <div className="profileAvatarSlot">
+                <Avatar userId={killerPoolProfileId} size={72} username={profileDisplayName} />
+                {viewingOwnProfile && profile?.sessionId ? (
+                  <>
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="visuallyHidden"
+                      onChange={onAvatarFile}
+                    />
+                    <button
+                      type="button"
+                      className="profileAvatarEditBtn"
+                      aria-label={avatarBusy ? 'Uploading profile photo' : 'Change profile picture'}
+                      title={avatarBusy ? 'Uploading…' : 'Change profile picture'}
+                      disabled={avatarBusy}
+                      onClick={() => avatarInputRef.current?.click()}
+                    >
+                      <svg className="profileAvatarEditBtn__icon" viewBox="0 0 24 24" aria-hidden>
+                        <path
+                          fill="currentColor"
+                          d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                        />
+                      </svg>
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
           <div className="profileIdentityBlock">
             <div className="profileNameRow">
               <h2>{profileDisplayName}</h2>
+            </div>
+            <div className="profileMetaRow">
               {timerRank !== null ? (
-                <div className="homeTimerRankBubble" aria-label="Current timer leaderboard rank">
-                  <span className="homeTimerRankBubble__label">Timer pool</span>
+                <div
+                  className="homeTimerRankBubble homeTimerRankBubble--profileCompact"
+                  aria-label={`Timer : number ${timerRank} ranked player`}
+                  title={`Timer : #${timerRank} ranked player`}
+                >
+                  <span className="homeTimerRankBubble__label">Timer :</span>
                   <span className="homeTimerRankBubble__value">#{timerRank} ranked player</span>
                 </div>
               ) : null}
-            </div>
-            <button
-              type="button"
-              className="profileFormRating profileFormRatingBtn"
-              aria-label={`Form rating ${formRating} out of 5. Open form breakdown.`}
-              onClick={() => setShowFormInfo(true)}
-            >
-              <span className="profileFormLabel">Form</span>
-              {Array.from({ length: 5 }, (_, index) => (
-                <svg
-                  key={index}
-                  viewBox="0 0 24 24"
-                  className="profileFormStar"
-                  aria-hidden="true"
-                >
+              <button
+                type="button"
+                className="profileFormRating profileFormRatingBtn profileFormRating--inline"
+                aria-label={`Form rating ${formRating} out of 5. Open form breakdown.`}
+                onClick={() => setShowFormInfo(true)}
+              >
+                <span className="profileFormLabel">Form</span>
+                {Array.from({ length: 5 }, (_, index) => (
+                  <svg
+                    key={index}
+                    viewBox="0 0 24 24"
+                    className="profileFormStar"
+                    aria-hidden="true"
+                  >
                   <defs>
                     <clipPath id={`profile-form-star-fill-${index}`}>
                       <rect
@@ -558,12 +747,57 @@ export function ProfilePage() {
                     clipPath={`url(#profile-form-star-fill-${index})`}
                   />
                 </svg>
-              ))}
-            </button>
+                ))}
+              </button>
+            </div>
           </div>
         </header>
 
         {error ? <p className="error">{error}</p> : null}
+
+        {!viewingOwnProfile && profile?.sessionId && killerPoolProfileId ? (
+          <div className="profileFriendBand">
+            {socialRel === 'loading' ? (
+              <p className="muted">Loading friendship…</p>
+            ) : (
+              <>
+                {socialRel === 'none' || socialRel === 'declined' ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    disabled={friendBusy}
+                    onClick={() => void onAddFriendProfile()}
+                  >
+                    Add friend
+                  </button>
+                ) : null}
+                {socialRel === 'pending_out' ? <span className="muted">Friend request pending</span> : null}
+                {socialRel === 'pending_in' ? (
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    disabled={friendBusy}
+                    onClick={() => void onAcceptFriendProfile()}
+                  >
+                    Accept request
+                  </button>
+                ) : null}
+                {socialRel === 'friends' ? (
+                  <div className="profileFriendRow">
+                    <span className="muted">Friends</span>
+                    <button type="button" className="btn btn--soft" disabled={friendBusy} onClick={() => void onUnfriendProfile()}>
+                      Unfriend
+                    </button>
+                  </div>
+                ) : null}
+                {friendMsg ? <p className="muted profileFriendMsg">{friendMsg}</p> : null}
+                <p className="muted profileFriendHint">
+                  Open <Link to="/social">Social</Link> for feed, requests, and 1v1 games.
+                </p>
+              </>
+            )}
+          </div>
+        ) : null}
 
         <section className="profileStatsGrid" aria-label="Profile highlights">
           <article className="profileStatCard">
@@ -599,6 +833,14 @@ export function ProfilePage() {
             <strong>{killerWinPct !== null ? `${killerWinPct}%` : '--'}</strong>
           </article>
         </section>
+
+        {viewingOwnProfile && killerPoolProfileId && (killerPoolStats.games > 0 || killerPoolStats.wins > 0) ? (
+          <section className="profileKillerStatsReset" aria-label="Killer mode local stats">
+            <button type="button" className="btn btn--soft" onClick={onResetKillerPoolStats}>
+              Reset killer stats on this device
+            </button>
+          </section>
+        ) : null}
 
         <section className="profileChartSection">
           <h3>Run Progress</h3>
@@ -674,8 +916,34 @@ export function ProfilePage() {
           )}
         </section>
 
+        <section className="profileTableSection profileH2hSection" aria-label="Head to head">
+          <h3>Head to head</h3>
+          {!h2hRows.length ? (
+            <p className="muted">No recorded 1v1 games yet.</p>
+          ) : (
+            <>
+              {h2hSummary && h2hSummary.games > 0 ? (
+                <p className="muted">
+                  {h2hSummary.games} games · {h2hSummary.wins}W-{h2hSummary.losses}L · Avg {h2hSummary.avgBallsFor ?? '—'} /{' '}
+                  {h2hSummary.avgBallsAgainst ?? '—'}
+                </p>
+              ) : null}
+              <ul className="socialH2hList">
+                {h2hRows.map((row) => {
+                  const vid = viewingOwnProfile ? killerPoolProfileId : profile?.id
+                  if (!vid) return null
+                  return <H2hRowWeb key={row.id} row={row} viewerId={vid} names={h2hNames} />
+                })}
+              </ul>
+            </>
+          )}
+        </section>
+
         <section className="profileTableSection">
           <h3>Recent Attempts</h3>
+          {profileRuns.length ? (
+            <p className="profileTableSectionHint">Tap for date</p>
+          ) : null}
           {profileRuns.length ? (
             <div className="profileTableWrap">
               <table className="profileTable">

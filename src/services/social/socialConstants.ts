@@ -1,0 +1,6 @@
+export const ACCOUNTS_TABLE = 'user_accounts'
+export const PROFILE_PICTURES_TABLE = 'profile_pictures'
+export const FRIENDSHIPS_TABLE = 'friendships'
+export const HEAD_TO_HEAD_TABLE = 'head_to_head_games'
+export const FEED_POSTS_TABLE = 'feed_posts'
+export const SOCIAL_IMAGES_BUCKET = 'social-images'

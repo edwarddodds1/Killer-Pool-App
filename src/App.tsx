@@ -7,6 +7,7 @@ import { RoomPage } from './routes/RoomPage'
 import { TimerPoolPage } from './routes/TimerPoolPage'
 import { TimerResultsPage } from './routes/TimerResultsPage'
 import { ProfilePage } from './routes/ProfilePage'
+import { SocialPage } from './routes/SocialPage'
 import { isSupabaseEnabled } from './lib/supabase'
 import { flushPendingTimerScores, startAccountSessionWatcher } from './utils/store'
 
@@ -49,6 +50,7 @@ function App() {
         <Route path="/room/:code" element={<RoomPage />} />
         <Route path="/timer" element={<TimerPoolPage />} />
         <Route path="/timer/results" element={<TimerResultsPage />} />
+        <Route path="/social" element={<SocialPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/:profileId" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ClipboardEvent, FormEvent, KeyboardEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
 import { getProfile, getRoom, getRoomRemote, upsertRoom, upsertRoomRemote } from '../utils/store'
 
 export function JoinPage() {
@@ -82,15 +83,9 @@ export function JoinPage() {
 
   return (
     <main className="page joinPage">
-      <div className="joinTitleRow">
-        <h1 className="joinTitle">Join Party</h1>
-        <div className="timerTitleActions">
-          <button type="button" className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/')} aria-label="Home">
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
-            </svg>
-          </button>
-        </div>
+      <div className="joinTitleRow pageHeadingRow">
+        <h1 className="joinTitle pageHeadingRow__title">Join Party</h1>
+        <AppHeaderNavIcons />
       </div>
       <section className="card card--pool joinCard">
         {!profile ? <p className="muted">Sign in from Home to join with your account.</p> : null}

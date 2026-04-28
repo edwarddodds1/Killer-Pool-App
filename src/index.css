@@ -9,6 +9,8 @@
   --red: #d63c3c;
   --radius: 16px;
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  /* Fixed strip for Profile / Social / Home so icons stay aligned across pages */
+  --app-header-nav-track: 190px;
   /* Pool table rail (only on .card--pool) — wood rail, cushion band, diamond sights */
   --pool-rail-outer: #1f140a;
   --pool-rail-face: #5c3d24;
@@ -48,6 +50,227 @@ body { margin: 0; background: var(--bg); }
   gap: 12px;
 }
 
+/* Title row: heading / main block in first column; fixed-width nav strip keeps icons aligned */
+.pageHeadingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--app-header-nav-track);
+  align-items: center;
+  column-gap: 10px;
+  row-gap: 0;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.pageHeadingRow__start {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pageHeadingRow__title {
+  margin: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pageHeadingRow .appHeaderNavIcons {
+  margin-left: 0;
+  justify-self: end;
+  width: 100%;
+  max-width: var(--app-header-nav-track);
+  justify-content: flex-end;
+  flex-shrink: 0;
+  align-self: center;
+}
+.appHeaderNavIcons {
+  display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.pageHeadingRow__tools,
+.header__tools {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+}
+.rulesHelpBtn {
+  border: 1px solid transparent;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  color: #454545;
+  cursor: pointer;
+}
+.rulesHelpBtn:hover {
+  border-color: var(--pool-rail-outer);
+  background: var(--pool-felt-wash);
+  color: #0f172a;
+}
+.rulesHelpBtn:focus-visible {
+  outline: 2px solid var(--pool-rail-outer);
+  outline-offset: 2px;
+}
+.rulesHelpBtn__icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+.rulesModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+@media (min-width: 520px) {
+  .rulesModalOverlay {
+    align-items: center;
+  }
+}
+.rulesModalPanel {
+  width: min(560px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: rulesModalIn 180ms ease-out;
+}
+.rulesModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.rulesModalTitle {
+  margin: 0;
+  font-size: 1.08rem;
+}
+.rulesModalClose {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #111;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  font-size: 1.25rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.rulesModalList {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 8px;
+}
+.rulesModalListItem {
+  color: #1f2937;
+  line-height: 1.4;
+  font-size: 0.92rem;
+}
+.rulesModalGotIt {
+  align-self: flex-end;
+}
+@keyframes rulesModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.appHeaderNavIcons a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: inherit;
+  flex-shrink: 0;
+}
+.appHeaderNavIcons .timerHomeBtn {
+  border: 1px solid transparent;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  box-sizing: border-box;
+}
+.appHeaderNavIcons__btn--active {
+  border-color: var(--pool-rail-outer) !important;
+  color: #0f172a;
+  background: var(--pool-felt-wash);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 0 0 1px var(--pool-cushion);
+}
+.appHeaderNavIcons__socialWrap {
+  position: relative;
+}
+/* Social group icon: fill the 44px circle (profile/home stay smaller via .timerHomeIcon) */
+.appHeaderNavIcons__socialWrap > svg,
+.appHeaderNavIcons__socialWrap svg.timerHomeIcon {
+  width: 38px;
+  height: 38px;
+  display: block;
+}
+.appHeaderNavIcons__badge {
+  position: absolute;
+  top: -5px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  line-height: 16px;
+  text-align: center;
+}
+.header:has(.appHeaderNavIcons) .appHeaderNavIcons {
+  margin-left: 0;
+  justify-self: end;
+  position: relative;
+  z-index: 5;
+  align-self: center;
+}
+.breakPreviewHeadingRow__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.socialPageHeadingRow .pageHeadingRow__title {
+  min-width: 0;
+  line-height: 1;
+}
+
 .homePage {
   position: relative;
   gap: 14px;
@@ -68,6 +291,15 @@ body { margin: 0; background: var(--bg); }
 }
 
 .brand { text-align: center; display: grid; place-items: center; gap: 8px; }
+/* Home hero: same two-column layout as other pages so nav icons line up */
+.brand.homeHero.pageHeadingRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--app-header-nav-track);
+  align-items: center;
+  column-gap: 12px;
+  text-align: left;
+  place-items: unset;
+}
 .homeHero {
   position: relative;
   z-index: 1;
@@ -77,6 +309,12 @@ body { margin: 0; background: var(--bg); }
   justify-content: flex-start;
   gap: 12px;
   padding-top: 0;
+}
+.homeHero__main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
 }
 .homeTitleBlock {
   min-height: 100px;
@@ -98,11 +336,14 @@ body { margin: 0; background: var(--bg); }
   display: block;
 }
 h1 {
-  font-size: clamp(2.3rem, 8.5vw, 3.35rem);
+  font-size: clamp(1.42rem, 3.8vw + 0.4rem, 2rem);
   font-weight: 950;
   letter-spacing: 0.03em;
   line-height: 1;
   margin: 0;
+}
+.homeHero .pageHeadingRow__title {
+  font-size: clamp(1.48rem, 4.2vw + 0.35rem, 2.12rem);
 }
 h1, h2, h3 {
   font-family: Cambria, Georgia, "Times New Roman", serif;
@@ -126,8 +367,8 @@ h2 { font-size: 1.2rem; }
 .homeTimerRankBubble__label {
   font-size: 0.62rem;
   font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
   color: #2a2a2a;
   line-height: 1;
 }
@@ -244,7 +485,9 @@ h2 { font-size: 1.2rem; }
 .card.card--pool > * {
   position: relative;
   z-index: 1;
-  margin: 3px 4px;
+  /* Vertical nudge only — horizontal margins break width:100% children vs the rail */
+  margin: 3px 0;
+  min-width: 0;
   box-sizing: border-box;
 }
 .card.card--pool .muted,
@@ -299,7 +542,38 @@ h2 { font-size: 1.2rem; }
   letter-spacing: 0.02em;
 }
 
-.header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+/* Room (and any row) with nav: same fixed nav column as .pageHeadingRow */
+.header:has(.appHeaderNavIcons) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--app-header-nav-track);
+  align-items: center;
+  isolation: isolate;
+}
+.headerMain {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  /* Ball tray is position:absolute and can paint over the next grid column; keep row on one axis */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.header .header__left {
+  min-width: 0;
+}
 .card.header {
   border-width: 3px;
   border-style: solid;
@@ -331,6 +605,17 @@ h2 { font-size: 1.2rem; }
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+.homeSessionFooter__guestBadge {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid #b9bec6;
+  background: #f3f4f6;
+  color: #5c6370;
 }
 .homeSessionFooter__profileLink {
   width: 28px;
@@ -739,10 +1024,12 @@ input, select, .btn {
 .headerBallIndicator .ball .ball__face span { font-size: 0.62rem; letter-spacing: -0.01em; }
 .headerBallIndicatorWrap {
   position: relative;
+  z-index: 0;
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
   min-height: 42px;
+  flex-shrink: 0;
 }
 .headerBallToggle {
   width: 42px;
@@ -770,6 +1057,7 @@ input, select, .btn {
   position: absolute;
   right: 46px;
   top: 50%;
+  z-index: 1;
   transform: translate(16px, -50%);
   opacity: 0;
   pointer-events: none;
@@ -1000,12 +1288,12 @@ input, select, .btn {
 .previewControls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .previewControls input[type='range'] { width: 100%; }
 
-.timerPage { gap: 10px; }
-.timerPageTitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.timerPage {
+  gap: 12px;
+}
+.timerPageTitleRow.pageHeadingRow {
   gap: 8px;
+  min-width: 0;
 }
 .timerTitleActions {
   display: inline-flex;
@@ -1015,6 +1303,12 @@ input, select, .btn {
 .timerPageTitleRow .timerTitle {
   text-align: left;
   margin: 0 0 2px;
+}
+.timerPageTitleRow.pageHeadingRow .timerTitle {
+  min-width: 0;
+}
+.joinTitleRow.pageHeadingRow .joinTitle {
+  min-width: 0;
 }
 .timerCard { gap: 10px; }
 .timerCard--main {
@@ -1026,11 +1320,14 @@ input, select, .btn {
 }
 .timerTitle {
   margin: 0;
-  text-align: center;
-  font-size: clamp(2.3rem, 8.5vw, 3.35rem);
+  text-align: left;
+  font-size: clamp(1.38rem, 3.6vw + 0.35rem, 1.95rem);
   font-weight: 950;
   letter-spacing: 0.03em;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .timerHomeBtn {
   border: 0;
@@ -1193,25 +1490,31 @@ input, select, .btn {
 .timerRow--leaderboard { grid-template-columns: auto 1fr auto; }
 
 /* Timer results/leaderboard screen */
-.timerResultsPage { gap: 0; padding-top: 10px; }
-.timerResultsTitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* Use default .page gap/padding like other routes */
+.timerResultsPage {
+  gap: 12px;
+}
+.timerResultsTitleRow.pageHeadingRow {
   gap: 8px;
-  margin-bottom: 10px;
+  min-width: 0;
 }
 .timerResultsTitleLeft {
   display: inline-flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 .timerResultsTitle {
-  font-size: clamp(2.3rem, 8.5vw, 3.35rem);
+  font-size: clamp(1.38rem, 3.6vw + 0.35rem, 1.95rem);
   font-weight: 900;
   letter-spacing: 0.03em;
   line-height: 1;
   margin: 0 0 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .adminModeIcon {
   display: inline-flex;
@@ -1263,6 +1566,15 @@ input, select, .btn {
 }
 .timerRow--leaderboardCompact {
   padding: 11px 13px;
+  /* Fixed rank column so avatars stay aligned when rank goes to double/triple digits */
+  grid-template-columns: minmax(3rem, 3rem) minmax(0, 1fr) auto;
+  gap: 10px;
+}
+.timerRow--leaderboardCompact > span:first-of-type {
+  display: block;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  justify-self: stretch;
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
 .timerRow--recent {
@@ -1391,11 +1703,9 @@ input, select, .btn {
 .profilePage {
   gap: 10px;
 }
-.profileTitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.profileTitleRow.pageHeadingRow {
   gap: 8px;
+  min-width: 0;
 }
 .profileTitleActions {
   display: inline-flex;
@@ -1403,11 +1713,14 @@ input, select, .btn {
   gap: 4px;
 }
 .profileTitle {
-  font-size: clamp(2.05rem, 8.2vw, 3.05rem);
+  font-size: clamp(1.35rem, 3.5vw + 0.35rem, 1.9rem);
   font-weight: 950;
   letter-spacing: 0.03em;
   line-height: 1;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .profileCard {
   gap: 16px;
@@ -1420,7 +1733,7 @@ input, select, .btn {
 }
 .profileIdentityBlock {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
 }
 .profileNameRow {
@@ -1438,9 +1751,51 @@ input, select, .btn {
   white-space: nowrap;
   padding-bottom: 2px;
 }
-.profileNameRow .homeTimerRankBubble {
+.profileMetaRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+.profileMetaRow .homeTimerRankBubble {
+  flex-shrink: 0;
+}
+.profileMetaRow .profileFormRatingBtn {
   margin-left: auto;
   flex-shrink: 0;
+}
+.profileMetaRow .profileFormRatingBtn:only-child {
+  margin-left: 0;
+}
+.homeTimerRankBubble--profileCompact {
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 2px 8px;
+  border-width: 2px;
+  border-radius: 10px;
+}
+.homeTimerRankBubble--profileCompact .homeTimerRankBubble__label {
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+}
+.homeTimerRankBubble--profileCompact .homeTimerRankBubble__value {
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+.profileFormRating--inline {
+  margin-top: 0;
+  gap: 2px;
+}
+.profileFormRating--inline .profileFormLabel {
+  font-size: 0.68rem;
+  margin-right: 2px;
+}
+.profileFormRating--inline .profileFormStar {
+  width: 12px;
+  height: 12px;
 }
 .profileCardHeader h2 {
   margin: 0;
@@ -1449,6 +1804,7 @@ input, select, .btn {
 }
 .profileFormRating {
   display: inline-flex;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 3px;
   margin-top: 6px;
@@ -1480,32 +1836,28 @@ input, select, .btn {
 .profileFormStarFill {
   color: #f59e0b;
 }
-.profileBackBtn {
-  display: inline-grid;
-  place-items: center;
-}
-.profileBackBtn svg {
-  width: 16px;
-  height: 16px;
-  display: block;
+.profileTitleRow.pageHeadingRow .pageHeadingRow__title {
+  min-width: 0;
+  text-align: left;
 }
 
 /* Join page */
 .joinPage {
   gap: 10px;
 }
-.joinTitleRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+.joinTitleRow.pageHeadingRow {
   gap: 8px;
+  min-width: 0;
 }
 .joinTitle {
-  font-size: clamp(2.05rem, 8.2vw, 3.05rem);
+  font-size: clamp(1.35rem, 3.5vw + 0.35rem, 1.9rem);
   font-weight: 950;
   letter-spacing: 0.03em;
   line-height: 1;
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .joinCard {
   gap: 12px;
@@ -1566,6 +1918,14 @@ input, select, .btn {
 .profileStatCard strong {
   font-size: 1.02rem;
 }
+.profileKillerStatsReset {
+  display: grid;
+  gap: 8px;
+  max-width: 40rem;
+}
+.profileKillerStatsReset .btn {
+  width: fit-content;
+}
 .profileChartSection,
 .profileTableSection {
   display: grid;
@@ -1575,6 +1935,14 @@ input, select, .btn {
 .profileTableSection h3 {
   margin: 0;
   font-size: 1rem;
+}
+.profileTableSectionHint {
+  margin: -2px 0 0;
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--muted);
+  opacity: 0.65;
+  letter-spacing: 0.02em;
 }
 .profileChartSurface {
   border: 1px solid var(--border);
@@ -1880,16 +2248,28 @@ input, select, .btn {
 }
 
 .leaveGameBtn {
-  border: 0;
-  background: transparent;
-  color: #454545;
-  font-size: 0.78rem;
-  letter-spacing: 0.02em;
+  display: block;
+  margin: 8px auto 0;
   width: fit-content;
-  margin: 6px auto 0;
-  min-height: 44px;
-  padding: 10px 12px;
+  padding: 4px 14px;
+  min-height: 0;
+  line-height: 1.25;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   cursor: pointer;
+  border: 1px solid rgba(214, 60, 60, 0.55);
+  border-radius: 999px;
+  background: rgba(214, 60, 60, 0.08);
+  color: var(--red);
+}
+.leaveGameBtn:hover {
+  background: rgba(214, 60, 60, 0.14);
+  border-color: rgba(214, 60, 60, 0.7);
+}
+.leaveGameBtn:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 2px;
 }
 
 @media (max-width: 520px) {
@@ -1912,7 +2292,10 @@ input, select, .btn {
     gap: 4px;
   }
   h1 {
-    font-size: clamp(2.15rem, 9vw, 2.85rem);
+    font-size: clamp(1.32rem, 4vw + 0.32rem, 1.82rem);
+  }
+  .homeHero .pageHeadingRow__title {
+    font-size: clamp(1.38rem, 4.2vw + 0.3rem, 1.88rem);
   }
   .homeTimerRankBubble {
     padding: 3px 8px;
@@ -1983,7 +2366,12 @@ input, select, .btn {
   .card.card--pool { padding: 38px 20px; gap: 14px; }
   .split { grid-template-columns: 1fr; }
   .homeActionsRow { grid-template-columns: 1fr; }
-  .header { align-items: flex-start; flex-wrap: wrap; }
+  .header:has(.appHeaderNavIcons) {
+    align-items: flex-start;
+  }
+  .headerMain {
+    flex-wrap: nowrap;
+  }
   .header__left { min-width: 0; }
   .header__left > div { min-width: 0; }
   .header__left strong,
@@ -2032,8 +2420,13 @@ input, select, .btn {
   .timerCard--main { min-height: calc(100vh - 220px); }
   .timerHomeBtn { font-size: 0.74rem; }
   .timerHomeIcon { width: 16px; height: 16px; }
+  .appHeaderNavIcons__socialWrap > svg,
+  .appHeaderNavIcons__socialWrap svg.timerHomeIcon {
+    width: 34px;
+    height: 34px;
+  }
   .timerTitle {
-    font-size: clamp(2.15rem, 9vw, 2.85rem);
+    font-size: clamp(1.28rem, 4.2vw + 0.3rem, 1.72rem);
   }
   .timerDisplay__group { min-width: 2ch; }
   .timerDisplay__separator { margin: 0 0.16ch; }
@@ -2051,7 +2444,7 @@ input, select, .btn {
   .timerResultsGrid { grid-template-columns: 1fr; }
   .timerResultsActions { grid-template-columns: 1fr; }
   .timerResultsTitle {
-    font-size: clamp(2.15rem, 9vw, 2.85rem);
+    font-size: clamp(1.28rem, 4.2vw + 0.3rem, 1.72rem);
   }
   .adminModeIcon {
     width: 26px;
@@ -2101,3 +2494,324 @@ input, select, .btn {
     height: 16px;
   }
 }
+
+/* App-wide nav + social (Vercel web parity with mobile) */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.socialAvatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+.socialAvatar__img {
+  display: block;
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+.socialAvatar__fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: 0.02em;
+}
+
+.socialPage {
+  gap: 12px;
+}
+.socialSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.socialTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.socialTabs__btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 700;
+  font-size: 0.86rem;
+  cursor: pointer;
+  color: #333;
+}
+.socialTabs__btn--active {
+  border-color: #1d4ed8;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+.socialSection.stack {
+  gap: 14px;
+}
+.socialFeedToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.socialFeedList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+.socialCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.socialCardRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.socialCardRow--spread {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.socialHint {
+  margin: -4px 0 4px;
+  font-size: 0.82rem;
+}
+.socialPendingBadge {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.socialGuestGate {
+  display: grid;
+  gap: 10px;
+  max-width: 42rem;
+}
+.socialGuestGate h2 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+}
+.socialGuestGate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.socialInlineCode {
+  font-size: 0.85em;
+  font-family: ui-monospace, monospace;
+  background: #f0f0f0;
+  padding: 1px 6px;
+  border-radius: 6px;
+}
+.socialRowInput {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.socialH2hList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.socialH2hItem {
+  font-size: 0.86rem;
+  color: var(--muted);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.socialModalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+@media (min-width: 520px) {
+  .socialModalOverlay {
+    align-items: center;
+  }
+}
+.socialModal {
+  width: min(520px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.socialModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.socialDualPick {
+  display: grid;
+  gap: 10px;
+}
+@media (min-width: 480px) {
+  .socialDualPick {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.socialChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.socialPostCard {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.socialPostHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.socialNameRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.socialDualImg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.socialDualImg__img {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #e5e5e5;
+}
+
+.profilePage .profileCardHeader {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 14px;
+}
+.profileAvatarWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+.profileAvatarSlot {
+  position: relative;
+  display: inline-block;
+  width: fit-content;
+  line-height: 0;
+}
+.profileAvatarEditBtn {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  margin: 0;
+  border: 2px solid #000;
+  border-radius: 50%;
+  background: #fff;
+  color: #000;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  box-sizing: border-box;
+}
+.profileAvatarEditBtn:hover:not(:disabled) {
+  background: #f4f4f4;
+}
+.profileAvatarEditBtn:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+.profileAvatarEditBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.profileAvatarEditBtn__icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+.profilePage .profileIdentityBlock {
+  flex: 1;
+  min-width: 0;
+}
+.profileFriendBand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+.profileFriendRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.profileFriendMsg {
+  margin: 0;
+}
+.profileFriendHint {
+  margin: 0;
+  font-size: 0.82rem;
+}
+.profileH2hSection h3 {
+  margin-top: 0;
+}
+.timerRowLeaderUser {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.timerRowLeaderUser .timerRowUser {
+  min-width: 0;
+}
+

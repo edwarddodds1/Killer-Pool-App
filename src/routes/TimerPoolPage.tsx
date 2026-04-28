@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { RulesHelpIconButton, RulesModal } from '../components/ui/RulesModal'
 import { addTimerScore, getProfile } from '../utils/store'
 
 const MIN_VALID_TIMER_RUN_MS = 20_000
@@ -27,6 +29,7 @@ export function TimerPoolPage() {
   const [countdownEnabled, setCountdownEnabled] = useState(false)
   const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null)
   const [penaltyCount, setPenaltyCount] = useState(0)
+  const [showRules, setShowRules] = useState(false)
   const audioContextRef = useRef<AudioContext | null>(null)
   const wakeLockRef = useRef<WakeLockSentinel | null>(null)
 
@@ -260,27 +263,11 @@ export function TimerPoolPage() {
 
   return (
     <main className="page timerPage">
-      <div className="timerPageTitleRow">
-        <h1 className="timerTitle">Timer</h1>
-        <div className="timerTitleActions">
-          <button type="button" className="timerHomeBtn timerHomeBtn--small" onClick={() => navigate('/profile')} aria-label="Profile">
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M12 12.2a4.1 4.1 0 1 0 0-8.2 4.1 4.1 0 0 0 0 8.2Zm0 2.3c-3.9 0-7.2 2.1-8.3 5.2-.2.6.2 1.3.9 1.3h14.8c.7 0 1.1-.7.9-1.3-1.1-3.1-4.4-5.2-8.3-5.2Z"
-                fill="currentColor"
-              />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="timerHomeBtn timerHomeBtn--small"
-            onClick={() => navigate('/')}
-            aria-label="Home"
-          >
-            <svg className="timerHomeIcon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3L12 3Z" fill="currentColor" />
-            </svg>
-          </button>
+      <div className="timerPageTitleRow pageHeadingRow">
+        <h1 className="timerTitle pageHeadingRow__title">Timer</h1>
+        <div className="pageHeadingRow__tools">
+          <RulesHelpIconButton onPress={() => setShowRules(true)} label="Timer Pool rules" />
+          <AppHeaderNavIcons />
         </div>
       </div>
       <section className="card card--pool timerCard timerCard--main">
@@ -357,6 +344,7 @@ export function TimerPoolPage() {
         </section>
         {error ? <p className="error">{error}</p> : null}
       </section>
+      <RulesModal visible={showRules} onClose={() => setShowRules(false)} gameMode="timer" />
     </main>
   )
 }
