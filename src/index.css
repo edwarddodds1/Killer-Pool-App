@@ -390,7 +390,6 @@ body { margin: 0; background: var(--bg); }
   min-width: 0;
 }
 .homeTitleBlock {
-  min-height: 100px;
   display: grid;
   align-content: center;
   gap: 6px;
@@ -426,7 +425,7 @@ h1, h2, p { margin: 0; }
 h2 { font-size: 1.2rem; }
 .homeTimerRankBubble {
   display: inline-flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: baseline;
   gap: 6px 8px;
   max-width: 100%;
@@ -436,6 +435,7 @@ h2 { font-size: 1.2rem; }
   background: #f7f7f7;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
   width: fit-content;
+  margin-top: 2px;
 }
 .homeTimerRankBubble__label {
   font-size: 0.62rem;
@@ -450,6 +450,7 @@ h2 { font-size: 1.2rem; }
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 /* Home: thick black border on setup / mode controls only (not auth or footer account links) */
@@ -2405,7 +2406,6 @@ input, select, .btn {
     width: 84px;
   }
   .homeTitleBlock {
-    min-height: 84px;
     gap: 4px;
   }
   h1 {
