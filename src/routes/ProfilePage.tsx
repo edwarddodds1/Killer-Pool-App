@@ -1,6 +1,7 @@
 import { type ChangeEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { AdminNameIcon } from '../components/AdminNameIcon'
 import { Avatar } from '../components/social/Avatar'
 import { H2hRowWeb } from '../components/social/H2hRowWeb'
 import { primeAvatarCache } from '../components/social/avatarCache'
@@ -981,7 +982,10 @@ export function ProfilePage() {
           ) : null}
           <div className="profileIdentityBlock">
             <div className="profileNameRow">
-              <h2>{profileDisplayName}</h2>
+              <h2 className="adminInlineName">
+                <span>{profileDisplayName}</span>
+                <AdminNameIcon username={profileDisplayName} />
+              </h2>
             </div>
             <div className="profileMetaRow">
               {timerRank !== null ? (

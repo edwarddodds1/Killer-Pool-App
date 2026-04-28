@@ -12,6 +12,7 @@ import {
   upsertRoomRemote,
 } from '../utils/store'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { AdminNameIcon } from '../components/AdminNameIcon'
 import { RulesHelpIconButton, RulesModal } from '../components/ui/RulesModal'
 import { useSocialNotifications } from '../components/social/useSocialNotifications'
 import { Avatar } from '../components/social/Avatar'
@@ -593,13 +594,14 @@ export function SocialPage() {
                   <div className="socialCardRow socialCardRow--spread">
                     <div className="socialCardRow">
                       <Avatar userId={s.profileId} size={40} username={s.username} />
-                      <strong>
+                      <strong className="adminInlineName">
                         <Link
                           className="socialProfileLink"
                           to={`/profile/${encodeURIComponent(s.profileId)}?username=${encodeURIComponent(s.username)}`}
                         >
-                          {s.username}
+                          <span>{s.username}</span>
                         </Link>
+                        <AdminNameIcon username={s.username} />
                       </strong>
                     </div>
                     <button
@@ -623,13 +625,14 @@ export function SocialPage() {
                 <div key={r.id} className="socialCard">
                   <div className="socialCardRow">
                     <Avatar userId={r.requesterProfileId} size={40} username={r.requesterUsername} />
-                    <strong>
+                    <strong className="adminInlineName">
                       <Link
                         className="socialProfileLink"
                         to={`/profile/${encodeURIComponent(r.requesterProfileId)}?username=${encodeURIComponent(r.requesterUsername)}`}
                       >
-                        {r.requesterUsername}
+                        <span>{r.requesterUsername}</span>
                       </Link>
+                      <AdminNameIcon username={r.requesterUsername} />
                     </strong>
                   </div>
                   <div className="socialRowInput">
@@ -653,13 +656,14 @@ export function SocialPage() {
                 <div key={r.id} className="socialCard">
                   <div className="socialCardRow">
                     <Avatar userId={r.recipientProfileId} size={40} username={r.recipientUsername} />
-                    <strong>
+                    <strong className="adminInlineName">
                       <Link
                         className="socialProfileLink"
                         to={`/profile/${encodeURIComponent(r.recipientProfileId)}?username=${encodeURIComponent(r.recipientUsername)}`}
                       >
-                        {r.recipientUsername}
+                        <span>{r.recipientUsername}</span>
                       </Link>
+                      <AdminNameIcon username={r.recipientUsername} />
                     </strong>
                     <span className="socialPendingBadge">Pending</span>
                   </div>
@@ -881,21 +885,23 @@ function FeedCard({ post, names }: { post: FeedPostRow; names: Record<string, st
         <Avatar userId={post.poster_profile_id} size={40} username={posterName} />
         <div>
           <div className="socialNameRow">
-            <strong>
+            <strong className="adminInlineName">
               <Link
                 className="socialProfileLink"
                 to={`/profile/${encodeURIComponent(post.poster_profile_id)}?username=${encodeURIComponent(posterName)}`}
               >
-                {posterName}
+                <span>{posterName}</span>
               </Link>
+              <AdminNameIcon username={posterName} />
             </strong>
             {post.winner_profile_id === post.poster_profile_id ? <span title="Winner">🏆</span> : null}
           </div>
           {oppName && oppId ? (
             <div className="socialNameRow">
               <Avatar userId={oppId} size={28} username={oppName} />
-              <Link className="socialProfileLink" to={`/profile/${encodeURIComponent(oppId)}?username=${encodeURIComponent(oppName)}`}>
-                {oppName}
+              <Link className="socialProfileLink adminInlineName" to={`/profile/${encodeURIComponent(oppId)}?username=${encodeURIComponent(oppName)}`}>
+                <span>{oppName}</span>
+                <AdminNameIcon username={oppName} />
               </Link>
               {post.winner_profile_id === oppId ? <span title="Winner">🏆</span> : null}
             </div>
@@ -951,13 +957,14 @@ function FriendRowWeb({
       <div className="socialCardRow">
         <Avatar userId={friend.friendProfileId} size={44} username={friend.friendUsername} />
         <div>
-          <strong>
+          <strong className="adminInlineName">
             <Link
               className="socialProfileLink"
               to={`/profile/${encodeURIComponent(friend.friendProfileId)}?username=${encodeURIComponent(friend.friendUsername)}`}
             >
-              {friend.friendUsername}
+              <span>{friend.friendUsername}</span>
             </Link>
+            <AdminNameIcon username={friend.friendUsername} />
           </strong>
           <div className="muted">{rivalry}</div>
         </div>

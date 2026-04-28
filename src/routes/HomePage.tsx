@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import type { GameMode, KillerAllocationMode } from '../types'
 import { buildNewRoom, createRandomCode } from '../utils/game'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { AdminNameIcon } from '../components/AdminNameIcon'
 import {
   clearProfile,
   getProfile,
@@ -317,7 +318,10 @@ export function HomePage() {
                 />
               </svg>
             </button>
-            <strong>{profile.username}</strong>
+            <strong className="adminInlineName">
+              <span>{profile.username}</span>
+              <AdminNameIcon username={profile.username} />
+            </strong>
             {!profile.sessionId ? (
               <span className="homeSessionFooter__guestBadge" title="Guest — sign in or create an account for Social and cloud saves">
                 Guest

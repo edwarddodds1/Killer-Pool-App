@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { AdminNameIcon } from '../components/AdminNameIcon'
 import { Avatar } from '../components/social/Avatar'
 import type { TimerScore } from '../types'
 import {
@@ -252,9 +253,7 @@ export function TimerResultsPage() {
         <div className="timerResultsTitleLeft pageHeadingRow__start">
           <h1 className="timerResultsTitle pageHeadingRow__title">Leaderboard</h1>
           {isAdmin ? (
-            <span className="adminModeIcon" aria-label="Admin mode active" title="Admin mode active">
-              👥
-            </span>
+            <AdminNameIcon username={profile?.username} />
           ) : null}
         </div>
         <AppHeaderNavIcons />
@@ -402,7 +401,10 @@ export function TimerResultsPage() {
                       <span>#{index + 1}</span>
                       <div className="timerRowLeaderUser">
                         <Avatar userId={leaderboardAvatarId(score)} size={32} username={score.username} />
-                        <span className="timerRowUser">{score.username}</span>
+                        <span className="timerRowUser adminInlineName">
+                          <span>{score.username}</span>
+                          <AdminNameIcon username={score.username} />
+                        </span>
                       </div>
                       <div className="timerRowActions">
                         {isFresh ? <span className="timerFreshBadge">NEW</span> : null}
@@ -447,7 +449,10 @@ export function TimerResultsPage() {
                   <span>#{index + 1}</span>
                   <div className="timerRowLeaderUser">
                     <Avatar userId={leaderboardAvatarId(entry)} size={32} username={entry.username} />
-                    <span className="timerRowUser">{entry.username}</span>
+                    <span className="timerRowUser adminInlineName">
+                      <span>{entry.username}</span>
+                      <AdminNameIcon username={entry.username} />
+                    </span>
                   </div>
                   <div className="timerRowActions">
                     <small>{entry.runs} {entry.runs === 1 ? 'run' : 'runs'}</small>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { AdminNameIcon } from '../components/AdminNameIcon'
 import { RulesHelpIconButton, RulesModal } from '../components/ui/RulesModal'
 import { AVATAR_ICONS } from '../constants/avatarIcons'
 import { AvatarBadge } from '../components/AvatarBadge'
@@ -812,7 +813,10 @@ export function RoomPage() {
           <div className="header__left">
             <AvatarBadge username={me.username} avatarIcon={me.avatarIcon} />
             <div>
-              <strong>{me.username}</strong>
+              <strong className="adminInlineName">
+                <span>{me.username}</span>
+                <AdminNameIcon username={me.username} />
+              </strong>
               {room.status === 'lobby' ? <p>Code: {room.code}</p> : null}
               {showPreGameModeLabel ? (
                 <div className="headerMetaRow">
@@ -919,8 +923,9 @@ export function RoomPage() {
               <div key={player.id} className="playerRow">
                 <div className="header__left">
                   <AvatarBadge username={player.username} avatarIcon={player.avatarIcon} size="sm" />
-                  <span>
-                    {player.username}
+                  <span className="adminInlineName">
+                    <span>{player.username}</span>
+                    <AdminNameIcon username={player.username} />
                     {player.isBot ? ' (BOT)' : ''}
                   </span>
                 </div>
@@ -1087,7 +1092,10 @@ export function RoomPage() {
                 >
                   <div className="stack center">
                     <AvatarBadge username={player.username} avatarIcon={player.avatarIcon} size="sm" />
-                    <small className="playerMiniName">{player.username}</small>
+                    <small className="playerMiniName adminInlineName">
+                      <span>{player.username}</span>
+                      <AdminNameIcon username={player.username} />
+                    </small>
                     {isTurn ? <small className="turnBadge">TURN</small> : null}
                   </div>
                   <div className={`playerMiniAssigned ${room.mode === 'killer' ? 'playerMiniAssigned--hidden' : ''}`}>
@@ -1128,7 +1136,10 @@ export function RoomPage() {
             {resultsOrder.map((player, index) => (
               <div className="playerRow" key={player.id}>
                 <span>
-                  {index + 1}. {player.username}
+                  <span className="adminInlineName">
+                    <span>{index + 1}. {player.username}</span>
+                    <AdminNameIcon username={player.username} />
+                  </span>
                 </span>
                 <small className="resultsStats">
                   <span className="resultsStat">
