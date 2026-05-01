@@ -91,3 +91,25 @@ export async function createFeedPostFromFiles(params: {
   })
   if (insErr) throw new Error(`Could not create post. (${insErr.message})`)
 }
+
+export async function updateFeedPostDetails(params: {
+  postId: string
+  caption: string | null
+  winnerProfileId: string | null
+}) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { error } = await supabase
+    .from(FEED_POSTS_TABLE)
+    .update({
+      caption: params.caption?.trim() || null,
+      winner_profile_id: params.winnerProfileId,
+    })
+    .eq('id', params.postId)
+  if (error) throw new Error(`Could not update post. (${error.message})`)
+}
+
+export async function deleteFeedPost(params: { postId: string }) {
+  if (!supabase) throw new Error('Supabase is not configured.')
+  const { error } = await supabase.from(FEED_POSTS_TABLE).delete().eq('id', params.postId)
+  if (error) throw new Error(`Could not delete post. (${error.message})`)
+}

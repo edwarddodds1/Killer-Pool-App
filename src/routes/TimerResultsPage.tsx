@@ -196,7 +196,6 @@ export function TimerResultsPage() {
         averageMs: Math.round(entry.totalMs / entry.runs),
       }))
       .sort((a, b) => a.averageMs - b.averageMs)
-      .slice(0, 10)
   }, [deferredScores])
 
   const hasPendingSync = useMemo(() => deferredScores.some((s) => s.pendingSync), [deferredScores])

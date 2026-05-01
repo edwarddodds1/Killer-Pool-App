@@ -66,9 +66,16 @@ function saveJson<T>(key: string, value: T) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
-function readLegacyKillerPoolStats(profileId: string) {
+function killerStatsUsernameKey(username: string | null | undefined) {
+  const normalized = username?.trim().toLowerCase()
+  if (!normalized) return null
+  return `u:${normalized}`
+}
+
+function readLegacyKillerPoolStats(profileId: string, username?: string) {
   const legacy = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_LEGACY_KEY, {})
-  const entry = legacy[profileId]
+  const alias = killerStatsUsernameKey(username)
+  const entry = legacy[profileId] ?? (alias ? legacy[alias] : undefined)
   if (!entry) return null
   const wins = Math.max(0, entry.wins || 0)
   const games = Math.max(0, entry.games || 0)
@@ -76,16 +83,19 @@ function readLegacyKillerPoolStats(profileId: string) {
   return { wins, games }
 }
 
-export function getKillerPoolStats(profileId: string) {
+export function getKillerPoolStats(profileId: string, username?: string) {
+  if (!profileId && !username) return { wins: 0, games: 0 }
   const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
-  const current = all[profileId]
+  const alias = killerStatsUsernameKey(username)
+  const current = all[profileId] ?? (alias ? all[alias] : undefined)
   const hasCurrent = current && (current.wins > 0 || current.games > 0)
 
   if (!hasCurrent) {
-    const legacy = readLegacyKillerPoolStats(profileId)
+    const legacy = readLegacyKillerPoolStats(profileId, username)
     if (legacy) {
       // Seed v2 from v1 once so subsequent reads/writes stay on the new key.
-      all[profileId] = legacy
+      if (profileId) all[profileId] = legacy
+      if (alias) all[alias] = legacy
       saveJson(KILLER_POOL_STATS_KEY, all)
       return legacy
     }
@@ -102,30 +112,46 @@ export function getKillerPoolStats(profileId: string) {
  * Local killer-mode stats only. Callers must not invoke this for rooms that include a bot
  * (`killerPoolRoomCountsTowardPlayerStats` in `utils/game`); bot matches never increment stats.
  */
-export function recordKillerPoolMatchResult(profileId: string, didWin: boolean) {
+export function recordKillerPoolMatchResult(profileId: string, didWin: boolean, username?: string) {
   const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
+  const alias = killerStatsUsernameKey(username)
   let baseline = all[profileId]
+  if ((!baseline || (baseline.wins === 0 && baseline.games === 0)) && alias) {
+    baseline = all[alias]
+  }
   if (!baseline || (baseline.wins === 0 && baseline.games === 0)) {
-    const legacy = readLegacyKillerPoolStats(profileId)
+    const legacy = readLegacyKillerPoolStats(profileId, username)
     if (legacy) baseline = legacy
   }
   const current = baseline ?? { wins: 0, games: 0 }
-  all[profileId] = {
+  const next = {
     wins: current.wins + (didWin ? 1 : 0),
     games: current.games + 1,
   }
+  all[profileId] = next
+  if (alias) all[alias] = next
   saveJson(KILLER_POOL_STATS_KEY, all)
 }
 
 /** Clears this profile's killer W/L counters (v2 + legacy v1) on this device only. */
-export function clearKillerPoolStatsForProfile(profileId: string) {
-  if (!profileId) return
+export function clearKillerPoolStatsForProfile(profileId: string, username?: string) {
+  if (!profileId && !username) return
+  const alias = killerStatsUsernameKey(username)
   const all = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_KEY, {})
-  delete all[profileId]
+  if (profileId) delete all[profileId]
+  if (alias) delete all[alias]
   saveJson(KILLER_POOL_STATS_KEY, all)
   const legacy = loadJson<KillerPoolStatsIndex>(KILLER_POOL_STATS_LEGACY_KEY, {})
-  if (legacy[profileId]) {
+  let touchedLegacy = false
+  if (profileId && legacy[profileId]) {
     delete legacy[profileId]
+    touchedLegacy = true
+  }
+  if (alias && legacy[alias]) {
+    delete legacy[alias]
+    touchedLegacy = true
+  }
+  if (touchedLegacy) {
     saveJson(KILLER_POOL_STATS_LEGACY_KEY, legacy)
   }
 }

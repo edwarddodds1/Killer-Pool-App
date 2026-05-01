@@ -94,14 +94,14 @@ export type HeadToHeadSummary = {
   games: number
   wins: number
   losses: number
-  avgBallsFor: number | null
-  avgBallsAgainst: number | null
+  totalBallsFor: number | null
+  totalBallsAgainst: number | null
 }
 
 export function summarizeHeadToHeadForViewer(rows: HeadToHeadRow[], viewerId: string): HeadToHeadSummary {
   const relevant = rows.filter((r) => involvesPlayer(r, viewerId))
   if (!relevant.length) {
-    return { games: 0, wins: 0, losses: 0, avgBallsFor: null, avgBallsAgainst: null }
+    return { games: 0, wins: 0, losses: 0, totalBallsFor: null, totalBallsAgainst: null }
   }
   let wins = 0
   let losses = 0
@@ -118,7 +118,7 @@ export function summarizeHeadToHeadForViewer(rows: HeadToHeadRow[], viewerId: st
     games: n,
     wins,
     losses,
-    avgBallsFor: Math.round((sumFor / n) * 10) / 10,
-    avgBallsAgainst: Math.round((sumAgainst / n) * 10) / 10,
+    totalBallsFor: sumFor,
+    totalBallsAgainst: sumAgainst,
   }
 }

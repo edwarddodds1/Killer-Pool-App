@@ -39,6 +39,24 @@ export async function lookupAccountByUsername(username: string): Promise<{
   return data ?? null
 }
 
+export async function searchAccountsByPrefix(
+  usernamePrefix: string,
+  limit = 3,
+): Promise<{ profile_id: string; username: string }[]> {
+  if (!supabase) return []
+  const normalized = normalizeUsername(usernamePrefix)
+  if (!normalized) return []
+  const { data, error } = await supabase
+    .from(ACCOUNTS_TABLE)
+    .select('profile_id, username')
+    .ilike('username_key', `${normalized}%`)
+    .order('username_key', { ascending: true })
+    .limit(Math.max(1, Math.min(limit, 10)))
+    .returns<{ profile_id: string; username: string }[]>()
+  if (error || !data) return []
+  return data
+}
+
 function pairOrFilter(a: string, b: string) {
   return `and(requester_profile_id.eq.${a},recipient_profile_id.eq.${b}),and(requester_profile_id.eq.${b},recipient_profile_id.eq.${a})`
 }
@@ -220,6 +238,17 @@ export async function declineFriendRequest(recipientProfileId: string, friendshi
   if (error) throw new Error(`Could not decline request. (${error.message})`)
 }
 
+export async function cancelOutgoingFriendRequest(requesterProfileId: string, friendshipId: string) {
+  if (!supabase) throw new Error('Friends service is unavailable.')
+  const { error } = await supabase
+    .from(FRIENDSHIPS_TABLE)
+    .delete()
+    .eq('id', friendshipId)
+    .eq('requester_profile_id', requesterProfileId)
+    .eq('status', 'pending')
+  if (error) throw new Error(`Could not cancel request. (${error.message})`)
+}
+
 export async function unfriend(profileId: string, friendProfileId: string) {
   if (!supabase) throw new Error('Friends service is unavailable.')
   const row = await fetchPairRow(profileId, friendProfileId)
@@ -233,6 +262,13 @@ export type PendingOutgoingRequest = {
   recipientProfileId: string
   recipientUsername: string
   createdAt: string
+}
+
+export type AcceptedOutgoingRequest = {
+  id: string
+  recipientProfileId: string
+  recipientUsername: string
+  approvedAt: string
 }
 
 export async function listPendingOutgoing(profileId: string): Promise<PendingOutgoingRequest[]> {
@@ -255,6 +291,32 @@ export async function listPendingOutgoing(profileId: string): Promise<PendingOut
       recipientProfileId: row.recipient_profile_id,
       recipientUsername: name,
       createdAt: row.created_at,
+    })
+  }
+  return out
+}
+
+export async function listAcceptedOutgoing(profileId: string): Promise<AcceptedOutgoingRequest[]> {
+  if (!supabase) return []
+  const { data, error } = await supabase
+    .from(FRIENDSHIPS_TABLE)
+    .select('id, recipient_profile_id, created_at')
+    .eq('requester_profile_id', profileId)
+    .eq('status', 'accepted')
+    .order('created_at', { ascending: false })
+    .limit(20)
+    .returns<{ id: string; recipient_profile_id: string; created_at: string }[]>()
+
+  if (error || !data) return []
+
+  const out: AcceptedOutgoingRequest[] = []
+  for (const row of data) {
+    const name = (await lookupUsername(row.recipient_profile_id)) ?? 'Player'
+    out.push({
+      id: row.id,
+      recipientProfileId: row.recipient_profile_id,
+      recipientUsername: name,
+      approvedAt: row.created_at,
     })
   }
   return out

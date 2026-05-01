@@ -1,5 +1,5 @@
 import { type ChangeEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
 import { AdminNameIcon } from '../components/AdminNameIcon'
 import { Avatar } from '../components/social/Avatar'
@@ -209,6 +209,7 @@ export function ProfilePage() {
   const [editingSeconds, setEditingSeconds] = useState('')
   const [selectedAttemptKey, setSelectedAttemptKey] = useState<string | null>(null)
   const [showFormInfo, setShowFormInfo] = useState(false)
+  const [activeStatInfo, setActiveStatInfo] = useState<{ title: string; description: string } | null>(null)
   const [h2hRows, setH2hRows] = useState<HeadToHeadRow[]>([])
   const [h2hNames, setH2hNames] = useState<Record<string, string>>({})
   const [socialRel, setSocialRel] = useState<
@@ -349,8 +350,8 @@ export function ProfilePage() {
   const killerPoolProfileId = viewingOwnProfile ? profile?.id : inferredViewedProfileId
   const killerPoolStats = useMemo(() => {
     if (!killerPoolProfileId) return { wins: 0, games: 0 }
-    return getKillerPoolStats(killerPoolProfileId)
-  }, [killerPoolProfileId, killerStatsEpoch])
+    return getKillerPoolStats(killerPoolProfileId, profileDisplayName)
+  }, [killerPoolProfileId, killerStatsEpoch, profileDisplayName])
   const killerWinRatioLabel = `${killerPoolStats.wins}/${killerPoolStats.games}`
   const killerWinPct = killerPoolStats.games > 0 ? Math.round((killerPoolStats.wins / killerPoolStats.games) * 100) : null
 
@@ -605,7 +606,7 @@ export function ProfilePage() {
       'Reset Killer mode wins and games to 0 on this browser? This only affects local stats and cannot be undone.',
     )
     if (!confirmed) return
-    clearKillerPoolStatsForProfile(killerPoolProfileId)
+    clearKillerPoolStatsForProfile(killerPoolProfileId, profileDisplayName)
     setKillerStatsEpoch((n) => n + 1)
   }
 
@@ -619,6 +620,10 @@ export function ProfilePage() {
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Could not delete account.')
     }
+  }
+
+  const openStatInfo = (title: string, description: string) => {
+    setActiveStatInfo({ title, description })
   }
 
   const refreshSocialRel = async () => {
@@ -982,10 +987,27 @@ export function ProfilePage() {
           ) : null}
           <div className="profileIdentityBlock">
             <div className="profileNameRow">
-              <h2 className="adminInlineName">
+              <h2 className={`adminInlineName${profileDisplayName.length > 9 ? ' profileName--compact' : ''}`}>
                 <span>{profileDisplayName}</span>
                 <AdminNameIcon username={profileDisplayName} />
               </h2>
+              {!viewingOwnProfile && profile?.sessionId && killerPoolProfileId && socialRel !== 'friends' ? (
+                <button
+                  type="button"
+                  className={`profileFriendStatusBubble profileFriendStatusBubble--${socialRel}`}
+                  onClick={() => navigate(`/social?friend=${encodeURIComponent(killerPoolProfileId)}`)}
+                  aria-label="Open this player in Social friends"
+                  title="Open this player in Social friends"
+                >
+                  {socialRel === 'pending_in'
+                      ? 'Respond'
+                      : socialRel === 'pending_out'
+                        ? 'Pending'
+                        : socialRel === 'loading'
+                          ? '...'
+                          : 'Add'}
+                </button>
+              ) : null}
             </div>
             <div className="profileMetaRow">
               {timerRank !== null ? (
@@ -998,51 +1020,53 @@ export function ProfilePage() {
                   <span className="homeTimerRankBubble__value">#{timerRank} ranked player</span>
                 </div>
               ) : null}
-              <button
-                type="button"
-                className="profileFormRating profileFormRatingBtn profileFormRating--inline"
-                aria-label={`Form rating ${formRating} out of 5. Open form breakdown.`}
-                onClick={() => setShowFormInfo(true)}
-              >
-                <span className="profileFormLabel">Form</span>
-                {Array.from({ length: 5 }, (_, index) => (
-                  <svg
-                    key={index}
-                    viewBox="0 0 24 24"
-                    className="profileFormStar"
-                    aria-hidden="true"
-                  >
-                  <defs>
-                    <clipPath id={`profile-form-star-fill-${index}`}>
-                      <rect
-                        x="0"
-                        y="0"
-                        width={`${Math.max(0, Math.min(1, formRating - index)) * 24}`}
-                        height="24"
-                      />
-                    </clipPath>
-                  </defs>
-                  <path
-                    className="profileFormStarBase"
-                    d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
-                    fill="currentColor"
-                  />
-                  <path
-                    className="profileFormStarFill"
-                    d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
-                    fill="currentColor"
-                    clipPath={`url(#profile-form-star-fill-${index})`}
-                  />
-                </svg>
-                ))}
-              </button>
+              {profileRuns.length >= 4 ? (
+                <button
+                  type="button"
+                  className="profileFormRating profileFormRatingBtn profileFormRating--inline"
+                  aria-label={`Form rating ${formRating} out of 5. Open form breakdown.`}
+                  onClick={() => setShowFormInfo(true)}
+                >
+                  <span className="profileFormLabel">Form</span>
+                  {Array.from({ length: 5 }, (_, index) => (
+                    <svg
+                      key={index}
+                      viewBox="0 0 24 24"
+                      className="profileFormStar"
+                      aria-hidden="true"
+                    >
+                    <defs>
+                      <clipPath id={`profile-form-star-fill-${index}`}>
+                        <rect
+                          x="0"
+                          y="0"
+                          width={`${Math.max(0, Math.min(1, formRating - index)) * 24}`}
+                          height="24"
+                        />
+                      </clipPath>
+                    </defs>
+                    <path
+                      className="profileFormStarBase"
+                      d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
+                      fill="currentColor"
+                    />
+                    <path
+                      className="profileFormStarFill"
+                      d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
+                      fill="currentColor"
+                      clipPath={`url(#profile-form-star-fill-${index})`}
+                    />
+                  </svg>
+                  ))}
+                </button>
+              ) : null}
             </div>
           </div>
         </header>
 
         {error ? <p className="error">{error}</p> : null}
 
-        {!viewingOwnProfile && profile?.sessionId && killerPoolProfileId ? (
+        {!viewingOwnProfile && profile?.sessionId && killerPoolProfileId && socialRel !== 'friends' ? (
           <div className="profileFriendBand">
             {socialRel === 'loading' ? (
               <p className="muted">Loading friendship…</p>
@@ -1069,20 +1093,9 @@ export function ProfilePage() {
                     Accept request
                   </button>
                 ) : null}
-                {socialRel === 'friends' ? (
-                  <div className="profileFriendRow">
-                    <span className="muted">Friends</span>
-                    <button type="button" className="btn btn--soft" disabled={friendBusy} onClick={() => void onUnfriendProfile()}>
-                      Unfriend
-                    </button>
-                  </div>
-                ) : null}
                 {socialRel !== 'pending_out' ? (
                   <>
                     {friendMsg ? <p className="muted profileFriendMsg">{friendMsg}</p> : null}
-                    <p className="muted profileFriendHint">
-                      Open <Link to="/social">Social</Link> for feed, requests, and 1v1 games.
-                    </p>
                   </>
                 ) : null}
               </>
@@ -1091,38 +1104,116 @@ export function ProfilePage() {
         ) : null}
 
         <section className="profileStatsGrid" aria-label="Profile highlights">
-          <article className="profileStatCard">
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('Best run', 'Your fastest recorded timer attempt on this profile.')
+            }
+          >
             <span>Best run</span>
             <strong>{bestRun ? formatTimerElapsedMs(bestRun.elapsedMs) : '--:--.--'}</strong>
-          </article>
-          <article className="profileStatCard">
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('Average run', 'The average time across all recorded timer attempts on this profile.')
+            }
+          >
             <span>Average run</span>
             <strong>{averageMs !== null ? formatTimerElapsedMs(averageMs) : '--:--.--'}</strong>
-          </article>
-          <article className="profileStatCard">
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('Total runs', 'How many timer attempts are currently recorded for this profile.')
+            }
+          >
             <span>Total runs</span>
             <strong>{profileRuns.length}</strong>
-          </article>
-          <article className="profileStatCard">
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo(
+                'Global best rank',
+                'Your best-time rank compared with other players based on each player’s fastest run.',
+              )
+            }
+          >
             <span>Global best rank</span>
             <strong>{personalRank ?? '--'}</strong>
-          </article>
-          <article className="profileStatCard">
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('Latest run', 'Your most recent recorded timer attempt.')
+            }
+          >
             <span>Latest run</span>
             <strong>{latestRun ? formatTimerElapsedMs(latestRun.elapsedMs) : '--:--.--'}</strong>
-          </article>
-          <article className="profileStatCard">
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('5 game average', 'Average time from your 5 most recent timer attempts.')
+            }
+          >
             <span>5 game average</span>
             <strong>{fiveGameAverageMs !== null ? formatTimerElapsedMs(fiveGameAverageMs) : '--:--.--'}</strong>
-          </article>
-          <article className="profileStatCard">
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('Killer win ratio', 'Your Killer mode wins versus total Killer games.')
+            }
+          >
             <span>Killer win ratio</span>
             <strong>{killerPoolStats.games > 0 ? killerWinRatioLabel : '--'}</strong>
-          </article>
-          <article className="profileStatCard">
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('Killer win %', 'Your Killer mode win percentage.')
+            }
+          >
             <span>Killer win %</span>
             <strong>{killerWinPct !== null ? `${killerWinPct}%` : '--'}</strong>
-          </article>
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo('1v1 W-L', 'Your total recorded 1v1 wins and losses.')
+            }
+          >
+            <span>1v1 W-L</span>
+            <strong>{h2hSummary ? `${h2hSummary.wins}-${h2hSummary.losses}` : '--'}</strong>
+          </button>
+          <button
+            type="button"
+            className="profileStatCard profileStatCard--button"
+            onClick={() =>
+              openStatInfo(
+                '1v1 balls (for/against)',
+                'Total balls remaining scored by you versus your opponents across recorded 1v1 games.',
+              )
+            }
+          >
+            <span>1v1 balls (for/against)</span>
+            <strong>
+              {h2hSummary && h2hSummary.totalBallsFor !== null && h2hSummary.totalBallsAgainst !== null
+                ? `${h2hSummary.totalBallsFor}/${h2hSummary.totalBallsAgainst}`
+                : '--'}
+            </strong>
+          </button>
         </section>
 
         {viewingOwnProfile && killerPoolProfileId && (killerPoolStats.games > 0 || killerPoolStats.wins > 0) ? (
@@ -1132,7 +1223,6 @@ export function ProfilePage() {
             </button>
           </section>
         ) : null}
-
         <section className="profileChartSection">
           <h3>Run Progress</h3>
           {lineChart.points.length ? (
@@ -1211,8 +1301,8 @@ export function ProfilePage() {
             <>
               {h2hSummary && h2hSummary.games > 0 ? (
                 <p className="muted">
-                  {h2hSummary.games} games · {h2hSummary.wins}W-{h2hSummary.losses}L · Avg {h2hSummary.avgBallsFor ?? '—'} /{' '}
-                  {h2hSummary.avgBallsAgainst ?? '—'}
+                  {h2hSummary.games} games · {h2hSummary.wins}W-{h2hSummary.losses}L · Balls {h2hSummary.totalBallsFor ?? '—'} /{' '}
+                  {h2hSummary.totalBallsAgainst ?? '—'}
                 </p>
               ) : null}
               <ul className="socialH2hList">
@@ -1321,6 +1411,13 @@ export function ProfilePage() {
               Delete account
             </button>
           </div>
+        ) : null}
+        {!viewingOwnProfile && profile?.sessionId && killerPoolProfileId && socialRel === 'friends' ? (
+          <section className="profileDangerActionRow" aria-label="Friend actions">
+            <button type="button" className="btn btn--danger" disabled={friendBusy} onClick={() => void onUnfriendProfile()}>
+              Unfriend
+            </button>
+          </section>
         ) : null}
       </section>
       {editingRun ? (
@@ -1448,6 +1545,25 @@ export function ProfilePage() {
             )}
             <div className="profileEditModalActions">
               <button type="button" className="btn btn--primary" onClick={() => setShowFormInfo(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {activeStatInfo ? (
+        <div className="profileEditModalOverlay" role="presentation" onClick={() => setActiveStatInfo(null)}>
+          <div
+            className="profileEditModal profileStatInfoModal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-stat-info-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="profile-stat-info-title">{activeStatInfo.title}</h3>
+            <p className="muted">{activeStatInfo.description}</p>
+            <div className="profileEditModalActions">
+              <button type="button" className="btn btn--primary" onClick={() => setActiveStatInfo(null)}>
                 Close
               </button>
             </div>

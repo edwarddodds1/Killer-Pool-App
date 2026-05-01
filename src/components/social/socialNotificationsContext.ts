@@ -2,11 +2,16 @@ import { createContext } from 'react'
 
 export type SocialNotificationItem = {
   id: string
-  type: 'friend_request' | 'post' | 'game'
+  type: 'friend_request' | 'friend_accepted' | 'pb' | 'post' | 'game'
   createdAt: string
   title: string
   body: string
+  pbElapsedMs?: number
+  pbDroppedMs?: number
+  pbRankCopy?: string
   href?: string
+  actorProfileId?: string
+  actorUsername?: string
 }
 
 export type SocialNotificationsValue = {

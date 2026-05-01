@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import {
   countPendingIncoming,
   getAcceptedFriends,
+  listAcceptedOutgoing,
   listPendingIncoming,
 } from '../../services/social/socialFriendshipService'
 import { fetchFeedPage, fetchUsernamesForProfileIds } from '../../services/social/socialFeedService'
@@ -11,9 +12,102 @@ import { getProfile } from '../../utils/store'
 import { SocialNotificationsContext } from './socialNotificationsContext'
 
 const NOTIFICATIONS_LIMIT = 20
+const TIMER_SCORES_TABLE = 'timer_pool_scores'
+
+type TimerScoreNotificationRow = {
+  profile_id: string
+  username: string
+  elapsed_ms: number
+  created_at: string
+}
 
 function notificationsSeenStorageKey(profileId: string) {
   return `killerpool:social-notifications-seen:${profileId}`
+}
+
+async function buildFriendPbNotifications(friendIds: string[]) {
+  const client = supabase
+  if (!client || !friendIds.length) return []
+
+  const { data: friendRows, error: friendRowsError } = await client
+    .from(TIMER_SCORES_TABLE)
+    .select('profile_id, username, elapsed_ms, created_at')
+    .in('profile_id', friendIds)
+    .order('created_at', { ascending: true })
+    .limit(500)
+    .returns<TimerScoreNotificationRow[]>()
+  if (friendRowsError || !friendRows) return []
+
+  const rowsByProfile = new Map<string, TimerScoreNotificationRow[]>()
+  for (const row of friendRows) {
+    const list = rowsByProfile.get(row.profile_id) ?? []
+    list.push(row)
+    rowsByProfile.set(row.profile_id, list)
+  }
+
+  const latestPbByProfile = new Map<
+    string,
+    {
+      profileId: string
+      username: string
+      elapsedMs: number
+      createdAt: string
+      droppedMs: number
+    }
+  >()
+  for (const [profileId, rows] of rowsByProfile) {
+    let bestSoFar = Number.POSITIVE_INFINITY
+    for (const row of rows) {
+      if (row.elapsed_ms < bestSoFar) {
+        if (Number.isFinite(bestSoFar)) {
+          latestPbByProfile.set(profileId, {
+            profileId,
+            username: row.username || 'A friend',
+            elapsedMs: row.elapsed_ms,
+            createdAt: row.created_at,
+            droppedMs: bestSoFar - row.elapsed_ms,
+          })
+        }
+        bestSoFar = row.elapsed_ms
+      }
+    }
+  }
+  if (!latestPbByProfile.size) return []
+
+  const { data: leaderboardRows, error: leaderboardError } = await client
+    .from(TIMER_SCORES_TABLE)
+    .select('profile_id, elapsed_ms')
+    .order('elapsed_ms', { ascending: true })
+    .limit(3000)
+    .returns<{ profile_id: string; elapsed_ms: number }[]>()
+  if (leaderboardError || !leaderboardRows) return []
+
+  const bestByProfile = new Map<string, number>()
+  for (const row of leaderboardRows) {
+    const current = bestByProfile.get(row.profile_id)
+    if (current === undefined || row.elapsed_ms < current) {
+      bestByProfile.set(row.profile_id, row.elapsed_ms)
+    }
+  }
+  const bestTimes = [...bestByProfile.values()].sort((a, b) => a - b)
+
+  return [...latestPbByProfile.values()].map((entry) => {
+    const rank = bestTimes.filter((time) => time < entry.elapsedMs).length + 1
+    const rankCopy = rank <= 10 ? `New leaderboard spot: #${rank}.` : `Now ranked #${rank} overall.`
+    return {
+      id: `pb:${entry.profileId}:${entry.createdAt}`,
+      type: 'pb' as const,
+      createdAt: entry.createdAt,
+      title: 'New personal best',
+      body: `${entry.username} hit a new PB.`,
+      pbElapsedMs: entry.elapsedMs,
+      pbDroppedMs: entry.droppedMs,
+      pbRankCopy: rankCopy,
+      href: `/profile/${encodeURIComponent(entry.profileId)}?username=${encodeURIComponent(entry.username)}`,
+      actorProfileId: entry.profileId,
+      actorUsername: entry.username,
+    }
+  })
 }
 
 export function SocialNotificationsProvider({ children }: { children: ReactNode }) {
@@ -47,9 +141,10 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
     }
 
     try {
-      const [pendingCount, pendingIncoming, friends, h2hRows] = await Promise.all([
+      const [pendingCount, pendingIncoming, acceptedOutgoing, friends, h2hRows] = await Promise.all([
         countPendingIncoming(profile.id),
         listPendingIncoming(profile.id),
+        listAcceptedOutgoing(profile.id),
         getAcceptedFriends(profile.id),
         listHeadToHeadForProfile(profile.id, 8),
       ])
@@ -57,6 +152,7 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
       setPendingFriendRequests(pendingCount)
 
       const friendIds = friends.map((entry) => entry.friendProfileId)
+      const pbNotifications = await buildFriendPbNotifications(friendIds)
       const feedPosts = friendIds.length
         ? await fetchFeedPage({
             viewerProfileId: profile.id,
@@ -86,7 +182,20 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
           title: 'New friend request',
           body: `${request.requesterUsername} wants to connect with you.`,
           href: `/profile/${encodeURIComponent(request.requesterProfileId)}?username=${encodeURIComponent(request.requesterUsername)}`,
+          actorProfileId: request.requesterProfileId,
+          actorUsername: request.requesterUsername,
         })),
+        ...acceptedOutgoing.map((request) => ({
+          id: `friend_accepted:${request.id}`,
+          type: 'friend_accepted' as const,
+          createdAt: request.approvedAt,
+          title: 'Friend request accepted',
+          body: `${request.recipientUsername} accepted your friend request.`,
+          href: `/profile/${encodeURIComponent(request.recipientProfileId)}?username=${encodeURIComponent(request.recipientUsername)}`,
+          actorProfileId: request.recipientProfileId,
+          actorUsername: request.recipientUsername,
+        })),
+        ...pbNotifications,
         ...feedPosts
           .filter((post) => post.poster_profile_id !== profile.id)
           .map((post) => {
@@ -99,6 +208,8 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
               title: 'New social post',
               body: oppName ? `${posterName} shared a post with ${oppName}.` : `${posterName} shared a new post.`,
               href: `/profile/${encodeURIComponent(post.poster_profile_id)}?username=${encodeURIComponent(posterName)}`,
+              actorProfileId: post.poster_profile_id,
+              actorUsername: posterName,
             }
           }),
         ...h2hRows.map((game) => {
@@ -115,6 +226,8 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
               ? `Your match against ${opponentName} was recorded as a win.`
               : `A match against ${opponentName} was recorded in Social.`,
             href: `/profile/${encodeURIComponent(opponentId)}?username=${encodeURIComponent(opponentName)}`,
+            actorProfileId: opponentId,
+            actorUsername: opponentName,
           }
         }),
       ]

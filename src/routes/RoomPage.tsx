@@ -349,7 +349,7 @@ export function RoomPage() {
     const winnerId = getResultsOrder(room)[0]?.id
     for (const player of room.players) {
       if (player.isBot) continue
-      recordKillerPoolMatchResult(player.id, player.id === winnerId)
+      recordKillerPoolMatchResult(player.id, player.id === winnerId, player.username)
     }
     recordedResultKeysRef.current.add(gameKey)
   }, [room])

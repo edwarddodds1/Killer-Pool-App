@@ -1663,7 +1663,7 @@ input, select, .btn {
   padding: 11px 13px;
 }
 .timerRow--leaderboardCompact {
-  padding: 11px 13px;
+  padding: 11px 13px 11px 10px;
   /* Fixed rank column so avatars stay aligned when rank goes to double/triple digits */
   grid-template-columns: minmax(3.75rem, 3.75rem) minmax(0, 1fr) auto;
   gap: 10px;
@@ -1671,9 +1671,9 @@ input, select, .btn {
 .timerRow--leaderboardCompact > span:first-of-type {
   display: block;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: left;
   justify-self: stretch;
-  padding-right: 4px;
+  padding-right: 0;
 }
 .timerRow--compact strong { font-variant-numeric: tabular-nums; }
 .timerRow--recent {
@@ -1830,6 +1830,35 @@ input, select, .btn {
   justify-content: space-between;
   align-items: flex-start;
   gap: 10px;
+  position: relative;
+}
+.profileFriendStatusBubble {
+  position: static;
+  margin-left: 8px;
+  flex-shrink: 0;
+  border: 1px solid #86efac;
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  z-index: 1;
+}
+.profileFriendStatusBubble--none,
+.profileFriendStatusBubble--declined {
+  border-color: #cbd5e1;
+  background: #e2e8f0;
+  color: #334155;
+}
+.profileFriendStatusBubble--pending_out,
+.profileFriendStatusBubble--pending_in,
+.profileFriendStatusBubble--loading {
+  border-color: #facc15;
+  background: #fef08a;
+  color: #854d0e;
 }
 .profileIdentityBlock {
   display: grid;
@@ -1846,10 +1875,14 @@ input, select, .btn {
 }
 .profileNameRow h2 {
   min-width: 0;
+  margin-right: auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   padding-bottom: 2px;
+}
+.profileNameRow h2.profileName--compact {
+  font-size: clamp(1.566rem, 5.508vw, 2.16rem);
 }
 .profileMetaRow {
   display: flex;
@@ -2018,12 +2051,33 @@ input, select, .btn {
 .profileStatCard strong {
   font-size: 1.02rem;
 }
+.profileStatCard--button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+.profileStatCard--button:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+.profileStatCard--button:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
 .profileKillerStatsReset {
   display: grid;
   gap: 8px;
   max-width: 40rem;
 }
 .profileKillerStatsReset .btn {
+  width: fit-content;
+}
+.profileDangerActionRow {
+  display: grid;
+  gap: 8px;
+}
+.profileDangerActionRow .btn {
   width: fit-content;
 }
 .profileChartSection,
@@ -2305,6 +2359,9 @@ input, select, .btn {
 }
 .profileFormInfoModal {
   width: min(460px, 100%);
+}
+.profileStatInfoModal {
+  width: min(420px, 100%);
 }
 .profileAvatarCropModal {
   width: min(460px, 100%);
@@ -2603,6 +2660,16 @@ input, select, .btn {
     font-size: 0.92rem;
     gap: 8px;
   }
+  .timerRow--leaderboardCompact {
+    grid-template-columns: minmax(3.75rem, 3.75rem) minmax(0, 1fr) auto;
+    padding-left: 10px;
+  }
+  .timerRow--leaderboardCompact > span:first-of-type {
+    text-align: left;
+    justify-self: stretch;
+    font-variant-numeric: tabular-nums;
+    padding-right: 0;
+  }
   .timerRow--recent {
     grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 6px;
@@ -2765,6 +2832,20 @@ input, select, .btn {
   height: 16px;
   display: block;
 }
+.socialIconBtn {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+}
+.socialRefreshIcon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
 .socialSection.stack {
   gap: 14px;
 }
@@ -2799,13 +2880,24 @@ input, select, .btn {
   box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
 }
 .socialNotificationCard--friend_request {
-  border-color: #fecaca;
+  border-color: #a5b4fc;
+  background: linear-gradient(180deg, #eef2ff 0%, #e9d5ff 100%);
+}
+.socialNotificationCard--friend_accepted {
+  border-color: #a5b4fc;
+  background: linear-gradient(180deg, #eef2ff 0%, #e9d5ff 100%);
+}
+.socialNotificationCard--pb {
+  border-color: #000;
+  background: linear-gradient(180deg, #ffedd5 0%, #fed7aa 100%);
 }
 .socialNotificationCard--post {
-  border-color: #bfdbfe;
+  border-color: #a5b4fc;
+  background: linear-gradient(180deg, #eef2ff 0%, #e9d5ff 100%);
 }
 .socialNotificationCard--game {
-  border-color: #c7f9cc;
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
 }
 .socialNotificationIcon {
   width: 40px;
@@ -2834,14 +2926,36 @@ input, select, .btn {
   margin: 0;
   color: #334155;
 }
+.socialPbBody {
+  display: grid;
+  gap: 4px;
+}
+.socialPbDrop {
+  color: #15803d;
+  font-weight: 800;
+}
+.socialPbRankCopy {
+  margin-top: 0;
+}
 .socialNotificationLink {
   font-weight: 700;
   width: fit-content;
 }
 .socialFeedToolbar {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
+}
+.socialFeedRefreshBtn {
+  border-color: #d4d4d8;
+  background: #f4f4f5;
+  color: #52525b;
+}
+.socialFeedRefreshBtn:hover:not(:disabled),
+.socialFeedRefreshBtn:focus-visible {
+  background: #e4e4e7;
+  color: #3f3f46;
 }
 .socialFeedList {
   display: flex;
@@ -2858,6 +2972,11 @@ input, select, .btn {
   flex-direction: column;
   gap: 10px;
 }
+.socialCard--highlighted {
+  border-color: #86efac;
+  background: linear-gradient(180deg, #f0fdf4 0%, #ecfdf5 100%);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.22), 0 8px 16px rgba(34, 197, 94, 0.12);
+}
 .socialCardRow {
   display: flex;
   align-items: center;
@@ -2869,6 +2988,26 @@ input, select, .btn {
   flex-wrap: wrap;
   gap: 8px;
 }
+.socialFriendRow {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+.socialFriendIdentityLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 1rem;
+}
+.socialAvatarLink {
+  display: inline-flex;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.socialAvatarLink:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
 .socialHint {
   margin: -4px 0 4px;
   font-size: 0.82rem;
@@ -2877,6 +3016,55 @@ input, select, .btn {
   margin-left: auto;
   font-size: 0.78rem;
   color: var(--muted);
+}
+.socialPendingActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.socialPendingActions .socialPendingBadge {
+  margin-left: 0;
+}
+.socialRivalryRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: 1em;
+  font-weight: 800;
+  color: #475569;
+  margin-left: 4px;
+}
+.socialRivalryRow__wins {
+  color: #15803d;
+}
+.socialRivalryRow__losses {
+  color: #b91c1c;
+}
+.socialRivalryRow__diff {
+  margin-left: 4px;
+}
+.socialRivalryRow__diff--plus {
+  color: #15803d;
+}
+.socialRivalryRow__diff--minus {
+  color: #b91c1c;
+}
+.socialChallengeBtn {
+  margin-left: auto;
+  min-height: 40px;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+.socialChallengeBtn__label {
+  line-height: 1;
 }
 .socialProfileLink {
   color: inherit;
@@ -2913,11 +3101,67 @@ input, select, .btn {
   gap: 8px;
   align-items: center;
 }
+.socialRowInput--friendSearch {
+  position: relative;
+  z-index: 3000;
+  isolation: isolate;
+}
+.socialRowInput--gameSearch {
+  position: relative;
+  z-index: 3000;
+  isolation: isolate;
+}
+.socialFriendLookup {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 0;
+  z-index: 3100;
+}
+.socialFriendLookup .fieldInput {
+  width: 100%;
+  direction: ltr;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+.socialSuggestDropdown {
+  position: absolute;
+  top: calc(100% + 1px);
+  left: 0;
+  right: 0;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.socialSuggestOption {
+  width: 100%;
+  border: 1px solid #94a3b8;
+  border-top: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #0f172a;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 0.86rem;
+  line-height: 1.1;
+  cursor: pointer;
+}
+.socialSuggestDropdown .socialSuggestOption:first-child {
+  border-top: 1px solid #94a3b8;
+}
+.socialSuggestOption:hover:not(:disabled),
+.socialSuggestOption:focus-visible {
+  background: #f8fafc;
+}
 .socialWinnerSliderWrap {
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 .socialWinnerSlider {
   width: 100%;
+  position: relative;
+  z-index: 1;
 }
 .socialWinnerSlider .modeSlider__btn {
   justify-self: stretch;
@@ -2938,6 +3182,16 @@ input, select, .btn {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
+}
+.socialH2hItem--win {
+  border-color: #86efac;
+  background: linear-gradient(180deg, #f0fdf4 0%, #dcfce7 100%);
+  color: #14532d;
+}
+.socialH2hItem--loss {
+  border-color: #fca5a5;
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+  color: #7f1d1d;
 }
 
 .socialModalOverlay {
@@ -2995,7 +3249,13 @@ input, select, .btn {
 }
 .socialPostHead {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+.socialPostHeadMain {
+  min-width: 0;
+  flex: 1;
+  display: grid;
   gap: 4px;
 }
 .socialNameRow {
@@ -3003,6 +3263,61 @@ input, select, .btn {
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+.socialWinnerBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #d4a017;
+  background: linear-gradient(180deg, #fef3c7 0%, #fde68a 100%);
+  color: #7c4a00;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.socialPostEdit {
+  display: grid;
+  gap: 8px;
+}
+.socialPostHeadActions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.socialPostIconBtn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  display: inline-grid;
+  place-items: center;
+  line-height: 1;
+  cursor: pointer;
+}
+.socialPostIconBtn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.socialPostIconBtn--danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+  background: #fef2f2;
+}
+.socialPostTimestamp {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #3f3f46;
 }
 .socialDualImg {
   display: grid;
@@ -3022,6 +3337,8 @@ input, select, .btn {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 14px;
+  padding: 10px;
+  box-sizing: border-box;
 }
 .profileAvatarWrap {
   display: flex;
@@ -3103,6 +3420,8 @@ input, select, .btn {
   align-items: center;
   gap: 8px;
   min-width: 0;
+  padding-left: 0;
+  margin-left: -31px;
 }
 .timerRowLeaderUser .timerRowUser {
   min-width: 0;

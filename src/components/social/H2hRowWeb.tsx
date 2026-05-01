@@ -1,5 +1,32 @@
 import type { HeadToHeadRow } from '../../services/social/socialHeadToHeadService'
 
+function formatRelativeTimestamp(iso: string) {
+  const createdMs = new Date(iso).getTime()
+  if (!Number.isFinite(createdMs)) return ''
+  const elapsedMs = Date.now() - createdMs
+  if (elapsedMs < 0) {
+    return new Date(createdMs).toLocaleDateString([], { day: 'numeric', month: 'short' })
+  }
+
+  const minuteMs = 60 * 1000
+  const hourMs = 60 * minuteMs
+  const dayMs = 24 * hourMs
+
+  if (elapsedMs < hourMs) {
+    const minutes = Math.max(1, Math.floor(elapsedMs / minuteMs))
+    return `${minutes} min ago`
+  }
+  if (elapsedMs < dayMs) {
+    const hours = Math.floor(elapsedMs / hourMs)
+    return `${hours}h ago`
+  }
+  if (elapsedMs < 4 * dayMs) {
+    const days = Math.floor(elapsedMs / dayMs)
+    return `${days}d ago`
+  }
+  return new Date(createdMs).toLocaleDateString([], { day: 'numeric', month: 'short' })
+}
+
 export function H2hRowWeb({
   row,
   viewerId,
@@ -14,9 +41,10 @@ export function H2hRowWeb({
   const won = row.winner_profile_id === viewerId
   const myBalls = row.player_one_profile_id === viewerId ? row.player_one_balls_remaining : row.player_two_balls_remaining
   const theirBalls = row.player_one_profile_id === viewerId ? row.player_two_balls_remaining : row.player_one_balls_remaining
+  const timestampLabel = formatRelativeTimestamp(row.played_at)
   return (
-    <li className="socialH2hItem">
-      vs {oppName} · {won ? 'W' : 'L'} · {myBalls}-{theirBalls} balls — {new Date(row.played_at).toLocaleString()}
+    <li className={`socialH2hItem ${won ? 'socialH2hItem--win' : 'socialH2hItem--loss'}`}>
+      vs {oppName} · {won ? 'W' : 'L'} · {myBalls}-{theirBalls} balls — {timestampLabel}
     </li>
   )
 }
