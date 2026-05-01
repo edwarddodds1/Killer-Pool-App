@@ -221,7 +221,7 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
             id: `game:${game.id}`,
             type: 'game' as const,
             createdAt: game.played_at,
-            title: '1v1 result recorded',
+            title: 'Challenge result recorded',
             body: youWon
               ? `Your match against ${opponentName} was recorded as a win.`
               : `A match against ${opponentName} was recorded in Social.`,
@@ -234,7 +234,14 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
         .slice(0, NOTIFICATIONS_LIMIT)
 
-      setNotifications(nextNotifications)
+      setNotifications((previous) => {
+        const mergedById = new Map<string, import('./socialNotificationsContext').SocialNotificationItem>()
+        for (const item of previous) mergedById.set(item.id, item)
+        for (const item of nextNotifications) mergedById.set(item.id, item)
+        return [...mergedById.values()]
+          .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+          .slice(0, NOTIFICATIONS_LIMIT)
+      })
     } catch {
       setNotifications([])
     }

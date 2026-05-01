@@ -7,7 +7,6 @@ import {
   hydrateProfileSessionFromServer,
 } from '../utils/store'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
-import { AdminNameIcon } from '../components/AdminNameIcon'
 import { RulesHelpIconButton, RulesModal } from '../components/ui/RulesModal'
 import { useSocialNotifications } from '../components/social/useSocialNotifications'
 import { Avatar } from '../components/social/Avatar'
@@ -105,7 +104,9 @@ export function SocialPage() {
   const [imgLeft, setImgLeft] = useState<File | null>(null)
   const [imgRight, setImgRight] = useState<File | null>(null)
   const [caption, setCaption] = useState('')
+  const [postOpponentMode, setPostOpponentMode] = useState<'friend' | 'other'>('friend')
   const [tagFriendId, setTagFriendId] = useState<string | null>(null)
+  const [postOtherOpponentUsername, setPostOtherOpponentUsername] = useState('')
   const [postWinnerSelf, setPostWinnerSelf] = useState<boolean | null>(null)
   const [postBusy, setPostBusy] = useState(false)
   const [postErr, setPostErr] = useState('')
@@ -253,6 +254,11 @@ export function SocialPage() {
 
   const onAddFriend = async () => {
     if (!profileId || !friendInput.trim()) return
+    if (profile && friendInput.trim().toLowerCase() === profile.username.trim().toLowerCase()) {
+      setFriendErr('You cannot add yourself as a friend.')
+      setFriendOk('')
+      return
+    }
     setFriendBusy(true)
     setFriendErr('')
     setFriendOk('')
@@ -380,18 +386,39 @@ export function SocialPage() {
       setPostErr('Choose two images.')
       return
     }
-    if (tagFriendId && postWinnerSelf === null) {
+    if (postWinnerSelf === null) {
       setPostErr('Select who won before posting.')
       return
     }
-    const opponentId = tagFriendId
-    let winnerId: string | null = null
-    if (tagFriendId && postWinnerSelf !== null) {
-      winnerId = postWinnerSelf ? profileId : tagFriendId
-    }
+
     setPostBusy(true)
     setPostErr('')
     try {
+      let opponentId: string | null = null
+      if (postOpponentMode === 'friend') {
+        if (!tagFriendId) {
+          setPostErr('Select a friend opponent before posting.')
+          return
+        }
+        opponentId = tagFriendId
+      } else {
+        const otherName = postOtherOpponentUsername.trim()
+        if (!otherName) {
+          setPostErr('Enter an opponent username before posting.')
+          return
+        }
+        const account = await lookupAccountByUsername(otherName)
+        if (!account) {
+          setPostErr('No player found for that username.')
+          return
+        }
+        if (account.profile_id === profileId) {
+          setPostErr('Pick someone else.')
+          return
+        }
+        opponentId = account.profile_id
+      }
+      const winnerId = postWinnerSelf ? profileId : opponentId
       await createFeedPostFromFiles({
         posterProfileId: profileId,
         opponentProfileId: opponentId,
@@ -404,7 +431,9 @@ export function SocialPage() {
       setImgLeft(null)
       setImgRight(null)
       setCaption('')
+      setPostOpponentMode('friend')
       setTagFriendId(null)
+      setPostOtherOpponentUsername('')
       setPostWinnerSelf(null)
       await loadFeed('reset')
       await refreshNotifications()
@@ -418,6 +447,10 @@ export function SocialPage() {
   const openComposer = () => {
     setPostErr('')
     void loadFriendsBlock()
+    setPostOpponentMode(friends.length ? 'friend' : 'other')
+    setTagFriendId(null)
+    setPostOtherOpponentUsername('')
+    setPostWinnerSelf(null)
     setComposerOpen(true)
   }
 
@@ -610,7 +643,7 @@ export function SocialPage() {
         <section className="card socialGuestGate">
           <h2>Saved account required</h2>
           <p className="muted">
-            You’re using <strong>Continue as guest</strong> on Home (no saved account). Friends, feed, and cloud 1v1 records need the
+            You’re using <strong>Continue as guest</strong> on Home (no saved account). Friends, feed, and cloud Challenge records need the
             same username and password you use on Home.
           </p>
           <p className="muted">
@@ -715,6 +748,7 @@ export function SocialPage() {
                 className="fieldInput"
                 placeholder="Username"
                 value={friendInput}
+                dir="ltr"
                 onChange={(e) => setFriendInput(e.target.value)}
                 maxLength={15}
               />
@@ -748,7 +782,7 @@ export function SocialPage() {
 
           {suggestFriendsFromH2h.length ? (
             <>
-              <h2>Suggested — from your 1v1 games</h2>
+              <h2>Suggested — from your Challenge games</h2>
               <p className="muted socialHint">Players you’ve recorded games with who aren’t friends yet.</p>
               {suggestFriendsFromH2h.map((s) => (
                 <div key={s.profileId} className="socialCard">
@@ -762,7 +796,6 @@ export function SocialPage() {
                         >
                           <span>{s.username}</span>
                         </Link>
-                        <AdminNameIcon username={s.username} />
                       </strong>
                     </div>
                     <button
@@ -793,7 +826,6 @@ export function SocialPage() {
                       >
                         <span>{r.requesterUsername}</span>
                       </Link>
-                      <AdminNameIcon username={r.requesterUsername} />
                     </strong>
                   </div>
                   <div className="socialRowInput">
@@ -824,7 +856,6 @@ export function SocialPage() {
                       >
                         <span>{r.recipientUsername}</span>
                       </Link>
-                      <AdminNameIcon username={r.recipientUsername} />
                     </strong>
                     <div className="socialPendingActions">
                       <span className="socialPendingBadge">Pending</span>
@@ -856,7 +887,7 @@ export function SocialPage() {
       {tab === 'games' ? (
         <section className="socialSection card card--pool stack">
           <div className="pageHeadingRow">
-            <h2 className="pageHeadingRow__title">Record 1v1</h2>
+            <h2 className="pageHeadingRow__title">Record Challenge</h2>
             <div className="pageHeadingRow__tools">
               <RulesHelpIconButton onPress={() => setShowRules(true)} label="Duel rules" />
             </div>
@@ -867,6 +898,7 @@ export function SocialPage() {
                 className="fieldInput"
                 placeholder="Opponent username"
                 value={gameSearch}
+                dir="ltr"
                 onChange={(e) => {
                   setGameSearch(e.target.value)
                   if (opponentPick && opponentPick.username.toLowerCase() !== e.target.value.trim().toLowerCase()) {
@@ -935,7 +967,7 @@ export function SocialPage() {
             {gameBusy ? 'Saving…' : 'Save game'}
           </button>
 
-          <h2>Your 1v1 history</h2>
+          <h2>Your Challenge history</h2>
           {h2hSummary && h2hSummary.games > 0 ? (
             <p className="muted">
               {h2hSummary.games} games · {h2hSummary.wins}W-{h2hSummary.losses}L · Balls {h2hSummary.totalBallsFor ?? '—'} /{' '}
@@ -1065,23 +1097,59 @@ export function SocialPage() {
                 />
               </label>
             </div>
-            <p className="muted">Tag opponent (optional)</p>
+            <p className="muted">Tag opponent (required)</p>
             <div className="socialChips">
-              <button type="button" className={`btn btn--soft${!tagFriendId ? ' btn--primary' : ''}`} onClick={() => setTagFriendId(null)}>
-                None
+              <button
+                type="button"
+                className={`btn btn--soft${postOpponentMode === 'friend' ? ' btn--primary' : ''}`}
+                onClick={() => {
+                  setPostOpponentMode('friend')
+                  setPostOtherOpponentUsername('')
+                }}
+              >
+                Friend
               </button>
-              {friends.map((f) => (
-                <button
-                  key={f.friendProfileId}
-                  type="button"
-                  className={`btn btn--soft${tagFriendId === f.friendProfileId ? ' btn--primary' : ''}`}
-                  onClick={() => setTagFriendId(f.friendProfileId)}
-                >
-                  {f.friendUsername}
-                </button>
-              ))}
+              <button
+                type="button"
+                className={`btn btn--soft${postOpponentMode === 'other' ? ' btn--primary' : ''}`}
+                onClick={() => {
+                  setPostOpponentMode('other')
+                  setTagFriendId(null)
+                }}
+              >
+                Other
+              </button>
             </div>
-            {tagFriendId ? (
+            {postOpponentMode === 'friend' ? (
+              <>
+                <div className="socialChips">
+                  {friends.map((f) => (
+                    <button
+                      key={f.friendProfileId}
+                      type="button"
+                      className={`btn btn--soft${tagFriendId === f.friendProfileId ? ' btn--primary' : ''}`}
+                      onClick={() => setTagFriendId(f.friendProfileId)}
+                    >
+                      {f.friendUsername}
+                    </button>
+                  ))}
+                </div>
+                {!friends.length ? <p className="muted">No friends found. Choose Other and type a username.</p> : null}
+              </>
+            ) : (
+              <label className="field">
+                Opponent username
+                <input
+                  className="fieldInput"
+                  value={postOtherOpponentUsername}
+                  onChange={(e) => setPostOtherOpponentUsername(e.target.value)}
+                  maxLength={15}
+                  placeholder="Type username"
+                  dir="ltr"
+                />
+              </label>
+            )}
+            {(postOpponentMode === 'other' || tagFriendId) ? (
               <div className="socialRowInput">
                 <button type="button" className={`btn${postWinnerSelf === true ? ' btn--primary' : ' btn--soft'}`} onClick={() => setPostWinnerSelf(true)}>
                   You win
@@ -1100,7 +1168,11 @@ export function SocialPage() {
               type="button"
               className="btn btn--go"
               onClick={() => void submitPost()}
-              disabled={postBusy || (Boolean(tagFriendId) && postWinnerSelf === null)}
+              disabled={
+                postBusy ||
+                postWinnerSelf === null ||
+                (postOpponentMode === 'friend' ? !tagFriendId : !postOtherOpponentUsername.trim())
+              }
             >
               {postBusy ? 'Posting…' : 'Post'}
             </button>
@@ -1205,7 +1277,6 @@ function FeedCard({
               >
                 <span>{posterName}</span>
               </Link>
-              <AdminNameIcon username={posterName} />
             </strong>
             {post.winner_profile_id === post.poster_profile_id ? winnerBadge : null}
           </div>
@@ -1214,7 +1285,6 @@ function FeedCard({
               <Avatar userId={oppId} size={28} username={oppName} />
               <Link className="socialProfileLink adminInlineName" to={`/profile/${encodeURIComponent(oppId)}?username=${encodeURIComponent(oppName)}`}>
                 <span>{oppName}</span>
-                <AdminNameIcon username={oppName} />
               </Link>
               {post.winner_profile_id === oppId ? winnerBadge : null}
             </div>
@@ -1397,7 +1467,6 @@ function FriendRowWeb({
               >
                 <span>{friend.friendUsername}</span>
               </Link>
-              <AdminNameIcon username={friend.friendUsername} />
             </strong>
             <div className="socialRivalryRow" aria-label="Head-to-head wins, losses, and total balls differential">
               <span className="socialRivalryRow__wins">{rivalry.wins}</span>

@@ -2360,6 +2360,9 @@ input, select, .btn {
 .profileFormInfoModal {
   width: min(460px, 100%);
 }
+.profileDeleteConfirmModal {
+  width: min(420px, 100%);
+}
 .profileStatInfoModal {
   width: min(420px, 100%);
 }
@@ -2752,6 +2755,7 @@ input, select, .btn {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  overflow: visible;
 }
 .socialTabs {
   display: flex;
@@ -2806,6 +2810,33 @@ input, select, .btn {
     width: 13px;
     height: 13px;
   }
+  .socialFriendRow {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .socialFriendRow > .socialCardRow {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .socialFriendIdentityLine {
+    flex-wrap: wrap;
+    gap: 6px;
+    font-size: 0.94rem;
+  }
+  .socialRivalryRow {
+    margin-left: 0;
+    font-size: 0.9rem;
+  }
+  .socialChallengeBtn {
+    margin-left: auto;
+    width: fit-content;
+    min-width: 0;
+    padding: 0 10px;
+    min-height: 30px;
+    height: 30px;
+    font-size: 0.74rem;
+    justify-content: center;
+  }
 }
 .socialTabs__btn--active {
   border-color: #1d4ed8;
@@ -2842,8 +2873,8 @@ input, select, .btn {
   place-items: center;
 }
 .socialRefreshIcon {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   display: block;
 }
 .socialSection.stack {
@@ -3103,32 +3134,36 @@ input, select, .btn {
 }
 .socialRowInput--friendSearch {
   position: relative;
-  z-index: 3000;
+  z-index: 5000;
   isolation: isolate;
 }
 .socialRowInput--gameSearch {
   position: relative;
-  z-index: 3000;
+  z-index: 5000;
   isolation: isolate;
+}
+.card.card--pool > .socialRowInput--friendSearch,
+.card.card--pool > .socialRowInput--gameSearch {
+  z-index: 5000;
 }
 .socialFriendLookup {
   position: relative;
   flex: 1 1 220px;
   min-width: 0;
-  z-index: 3100;
+  z-index: 5100;
 }
 .socialFriendLookup .fieldInput {
   width: 100%;
   direction: ltr;
   text-align: left;
-  unicode-bidi: plaintext;
+  unicode-bidi: isolate;
 }
 .socialSuggestDropdown {
   position: absolute;
   top: calc(100% + 1px);
   left: 0;
   right: 0;
-  z-index: 4000;
+  z-index: 6000;
   display: flex;
   flex-direction: column;
   gap: 0;

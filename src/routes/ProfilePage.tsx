@@ -210,6 +210,7 @@ export function ProfilePage() {
   const [selectedAttemptKey, setSelectedAttemptKey] = useState<string | null>(null)
   const [showFormInfo, setShowFormInfo] = useState(false)
   const [activeStatInfo, setActiveStatInfo] = useState<{ title: string; description: string } | null>(null)
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false)
   const [h2hRows, setH2hRows] = useState<HeadToHeadRow[]>([])
   const [h2hNames, setH2hNames] = useState<Record<string, string>>({})
   const [socialRel, setSocialRel] = useState<
@@ -242,6 +243,8 @@ export function ProfilePage() {
     startOffsetY: number
     startCenterX: number
     startCenterY: number
+    frameCenterX: number
+    frameCenterY: number
   } | null>(null)
   const deferredScores = useDeferredValue(scores)
   const requestedUsername = (searchParams.get('username') ?? '').trim()
@@ -611,8 +614,6 @@ export function ProfilePage() {
   }
 
   const onDeleteAccount = async () => {
-    const confirmed = window.confirm('Delete your account? This removes your account credentials from this app.')
-    if (!confirmed) return
     setError('')
     try {
       await deleteCurrentAccount()
@@ -694,6 +695,7 @@ export function ProfilePage() {
 
   const onAvatarCropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!avatarCropMetrics || avatarBusy) return
+    event.preventDefault()
     const nextPoint = { x: event.clientX, y: event.clientY }
     avatarPointerPositionsRef.current.set(event.pointerId, nextPoint)
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -703,6 +705,7 @@ export function ProfilePage() {
       const [first, second] = entries
       if (!first || !second) return
       const center = getPointerCenter(first[1], second[1])
+      const frameRect = event.currentTarget.getBoundingClientRect()
       avatarPinchStateRef.current = {
         pointerA: first[0],
         pointerB: second[0],
@@ -712,6 +715,8 @@ export function ProfilePage() {
         startOffsetY: avatarCropOffsetY,
         startCenterX: center.x,
         startCenterY: center.y,
+        frameCenterX: frameRect.left + frameRect.width / 2,
+        frameCenterY: frameRect.top + frameRect.height / 2,
       }
       avatarPanStateRef.current = null
       return
@@ -730,6 +735,7 @@ export function ProfilePage() {
     if (!avatarCropDraft || avatarBusy) return
     const existing = avatarPointerPositionsRef.current.get(event.pointerId)
     if (!existing) return
+    event.preventDefault()
     avatarPointerPositionsRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
 
     const pinch = avatarPinchStateRef.current
@@ -747,9 +753,25 @@ export function ProfilePage() {
       const center = getPointerCenter(pointA, pointB)
       const deltaX = center.x - pinch.startCenterX
       const deltaY = center.y - pinch.startCenterY
+      const zoomRatio = nextZoom / Math.max(0.0001, pinch.startZoom)
+      // Keep zoom tied to finger focal point (same behavior users expect from map/photo apps).
+      const focalCompensationX = (pinch.startCenterX - pinch.frameCenterX) * (1 - zoomRatio)
+      const focalCompensationY = (pinch.startCenterY - pinch.frameCenterY) * (1 - zoomRatio)
       setAvatarCropZoom(nextZoom)
-      setAvatarCropOffsetX(clampRange(pinch.startOffsetX + deltaX, -nextMetrics.offsetXRange, nextMetrics.offsetXRange))
-      setAvatarCropOffsetY(clampRange(pinch.startOffsetY + deltaY, -nextMetrics.offsetYRange, nextMetrics.offsetYRange))
+      setAvatarCropOffsetX(
+        clampRange(
+          pinch.startOffsetX + deltaX + focalCompensationX,
+          -nextMetrics.offsetXRange,
+          nextMetrics.offsetXRange,
+        ),
+      )
+      setAvatarCropOffsetY(
+        clampRange(
+          pinch.startOffsetY + deltaY + focalCompensationY,
+          -nextMetrics.offsetYRange,
+          nextMetrics.offsetYRange,
+        ),
+      )
       return
     }
 
@@ -769,6 +791,7 @@ export function ProfilePage() {
       const [first, second] = entries
       if (!first || !second) return
       const center = getPointerCenter(first[1], second[1])
+      const frameRect = event.currentTarget.getBoundingClientRect()
       avatarPinchStateRef.current = {
         pointerA: first[0],
         pointerB: second[0],
@@ -778,6 +801,8 @@ export function ProfilePage() {
         startOffsetY: avatarCropOffsetY,
         startCenterX: center.x,
         startCenterY: center.y,
+        frameCenterX: frameRect.left + frameRect.width / 2,
+        frameCenterY: frameRect.top + frameRect.height / 2,
       }
       avatarPanStateRef.current = null
       return
@@ -1191,10 +1216,10 @@ export function ProfilePage() {
             type="button"
             className="profileStatCard profileStatCard--button"
             onClick={() =>
-              openStatInfo('1v1 W-L', 'Your total recorded 1v1 wins and losses.')
+              openStatInfo('Challenge W-L', 'Your total recorded Challenge wins and losses.')
             }
           >
-            <span>1v1 W-L</span>
+            <span>Challenge W-L</span>
             <strong>{h2hSummary ? `${h2hSummary.wins}-${h2hSummary.losses}` : '--'}</strong>
           </button>
           <button
@@ -1202,12 +1227,12 @@ export function ProfilePage() {
             className="profileStatCard profileStatCard--button"
             onClick={() =>
               openStatInfo(
-                '1v1 balls (for/against)',
-                'Total balls remaining scored by you versus your opponents across recorded 1v1 games.',
+                'Challenge balls (for/against)',
+                'Total balls remaining scored by you versus your opponents across recorded Challenge games.',
               )
             }
           >
-            <span>1v1 balls (for/against)</span>
+            <span>Challenge Balls</span>
             <strong>
               {h2hSummary && h2hSummary.totalBallsFor !== null && h2hSummary.totalBallsAgainst !== null
                 ? `${h2hSummary.totalBallsFor}/${h2hSummary.totalBallsAgainst}`
@@ -1296,7 +1321,7 @@ export function ProfilePage() {
         <section className="profileTableSection profileH2hSection" aria-label="Head to head">
           <h3>Head to head</h3>
           {!h2hRows.length ? (
-            <p className="muted">No recorded 1v1 games yet.</p>
+            <p className="muted">No recorded Challenge games yet.</p>
           ) : (
             <>
               {h2hSummary && h2hSummary.games > 0 ? (
@@ -1407,7 +1432,7 @@ export function ProfilePage() {
         </section>
         {viewingOwnProfile ? (
           <div className="profileBottomActions">
-            <button className="btn btn--danger" type="button" onClick={() => void onDeleteAccount()}>
+            <button className="btn btn--danger" type="button" onClick={() => setShowDeleteAccountConfirm(true)}>
               Delete account
             </button>
           </div>
@@ -1565,6 +1590,39 @@ export function ProfilePage() {
             <div className="profileEditModalActions">
               <button type="button" className="btn btn--primary" onClick={() => setActiveStatInfo(null)}>
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {showDeleteAccountConfirm ? (
+        <div className="profileEditModalOverlay" role="presentation" onClick={() => setShowDeleteAccountConfirm(false)}>
+          <div
+            className="profileEditModal profileDeleteConfirmModal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-delete-confirm-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 id="profile-delete-confirm-title">Delete account?</h3>
+            <p className="muted">This removes your account credentials from this app.</p>
+            <div className="profileEditModalActions">
+              <button
+                type="button"
+                className="btn btn--danger"
+                onClick={() => {
+                  setShowDeleteAccountConfirm(false)
+                  void onDeleteAccount()
+                }}
+              >
+                Delete account
+              </button>
+              <button
+                type="button"
+                className="btn btn--soft"
+                onClick={() => setShowDeleteAccountConfirm(false)}
+              >
+                Cancel
               </button>
             </div>
           </div>
