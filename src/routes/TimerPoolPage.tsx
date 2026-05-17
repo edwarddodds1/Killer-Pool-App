@@ -266,12 +266,12 @@ export function TimerPoolPage() {
       <div className="timerPageTitleRow pageHeadingRow">
         <h1 className="timerTitle pageHeadingRow__title">Timer</h1>
         <div className="pageHeadingRow__tools">
-          <RulesHelpIconButton onPress={() => setShowRules(true)} label="Timer Pool rules" />
           <AppHeaderNavIcons />
         </div>
       </div>
       <section className="card card--pool timerCard timerCard--main">
         <div className="timerDisplayWrap">
+          <RulesHelpIconButton onPress={() => setShowRules(true)} label="Timer Pool rules" />
           {penaltyCount > 0 ? (
             <div className="timerPenaltyDots" aria-label={`${penaltyCount} penalty ${penaltyCount === 1 ? 'dot' : 'dots'}`}>
               {Array.from({ length: penaltyCount }, (_, index) => (
@@ -297,7 +297,12 @@ export function TimerPoolPage() {
               Stop
             </button>
           )}
-          <button className="btn" onClick={finishRun} disabled={elapsedMs === 0 || saving || countdownRemaining !== null}>
+          <button
+            type="button"
+            className="btn btn--go timerFinishBtn"
+            onClick={finishRun}
+            disabled={elapsedMs === 0 || saving || countdownRemaining !== null}
+          >
             Finish
           </button>
         </div>

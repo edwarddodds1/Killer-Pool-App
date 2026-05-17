@@ -11,6 +11,8 @@ import { RulesHelpIconButton, RulesModal } from '../components/ui/RulesModal'
 import { useSocialNotifications } from '../components/social/useSocialNotifications'
 import { Avatar } from '../components/social/Avatar'
 import { H2hRowWeb } from '../components/social/H2hRowWeb'
+import { formatChallengeBallsMarginLabel } from '../services/social/socialHeadToHeadService'
+import { mergeFeedPostsNewestFirst, sortFeedPostsNewestFirst } from '../services/social/socialFeedService'
 import { formatTimerElapsedMs } from '../../shared/timerLeaderboard'
 import {
   acceptFriendRequest,
@@ -71,6 +73,16 @@ export function SocialPage() {
       alive = false
     }
   }, [refreshFriendBadge, refreshNotifications])
+
+  const friendOkClearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const friendErrClearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (friendOkClearRef.current) clearTimeout(friendOkClearRef.current)
+      if (friendErrClearRef.current) clearTimeout(friendErrClearRef.current)
+    }
+  }, [])
 
   const [friends, setFriends] = useState<FriendRecord[]>([])
   const [pendingIn, setPendingIn] = useState<PendingIncomingRequest[]>([])
@@ -184,12 +196,16 @@ export function SocialPage() {
         const names = await fetchUsernamesForProfileIds([...ids])
         setNameById((prev) => ({ ...prev, ...names }))
         if (mode === 'reset') {
-          setFeedPosts(rows)
-          feedOffsetRef.current = rows.length
-          setFeedHasMore(rows.length === PAGE)
+          const sorted = sortFeedPostsNewestFirst(rows)
+          setFeedPosts(sorted)
+          feedOffsetRef.current = sorted.length
+          setFeedHasMore(sorted.length === PAGE)
         } else {
-          setFeedPosts((prev) => [...prev, ...rows])
-          feedOffsetRef.current += rows.length
+          setFeedPosts((prev) => {
+            const merged = mergeFeedPostsNewestFirst(prev, rows)
+            feedOffsetRef.current = merged.length
+            return merged
+          })
           setFeedHasMore(rows.length === PAGE)
         }
       } catch (e) {
@@ -255,23 +271,49 @@ export function SocialPage() {
   const onAddFriend = async () => {
     if (!profileId || !friendInput.trim()) return
     if (profile && friendInput.trim().toLowerCase() === profile.username.trim().toLowerCase()) {
-      setFriendErr('You cannot add yourself as a friend.')
+      const selfMsg = 'You cannot add yourself as a friend.'
+      setFriendErr(selfMsg)
       setFriendOk('')
+      if (friendErrClearRef.current) {
+        clearTimeout(friendErrClearRef.current)
+        friendErrClearRef.current = null
+      }
+      friendErrClearRef.current = setTimeout(() => {
+        setFriendErr((t) => (t === selfMsg ? '' : t))
+        friendErrClearRef.current = null
+      }, 3000)
       return
     }
     setFriendBusy(true)
     setFriendErr('')
+    if (friendOkClearRef.current) {
+      clearTimeout(friendOkClearRef.current)
+      friendOkClearRef.current = null
+    }
+    if (friendErrClearRef.current) {
+      clearTimeout(friendErrClearRef.current)
+      friendErrClearRef.current = null
+    }
     setFriendOk('')
     try {
       await sendFriendRequestByUsername(profileId, friendInput)
       setFriendOk('Request sent.')
+      friendOkClearRef.current = setTimeout(() => {
+        setFriendOk((t) => (t === 'Request sent.' ? '' : t))
+        friendOkClearRef.current = null
+      }, 3000)
       setFriendInput('')
       setFriendSuggestions([])
       await loadFriendsBlock()
       await refreshFriendBadge()
       await refreshNotifications()
     } catch (e) {
-      setFriendErr(e instanceof Error ? e.message : 'Could not send request.')
+      const msg = e instanceof Error ? e.message : 'Could not send request.'
+      setFriendErr(msg)
+      friendErrClearRef.current = setTimeout(() => {
+        setFriendErr((t) => (t === msg ? '' : t))
+        friendErrClearRef.current = null
+      }, 3000)
     } finally {
       setFriendBusy(false)
     }
@@ -581,6 +623,10 @@ export function SocialPage() {
     if (!profileId) return
     setFriendBusy(true)
     setFriendErr('')
+    if (friendErrClearRef.current) {
+      clearTimeout(friendErrClearRef.current)
+      friendErrClearRef.current = null
+    }
     try {
       await sendFriendRequestByUsername(profileId, username)
       setFriendInput('')
@@ -589,7 +635,12 @@ export function SocialPage() {
       await refreshNotifications()
       await refreshFriendBadge()
     } catch (e) {
-      setFriendErr(e instanceof Error ? e.message : 'Could not send request.')
+      const msg = e instanceof Error ? e.message : 'Could not send request.'
+      setFriendErr(msg)
+      friendErrClearRef.current = setTimeout(() => {
+        setFriendErr((t) => (t === msg ? '' : t))
+        friendErrClearRef.current = null
+      }, 3000)
     } finally {
       setFriendBusy(false)
     }
@@ -887,7 +938,7 @@ export function SocialPage() {
       {tab === 'games' ? (
         <section className="socialSection card card--pool stack">
           <div className="pageHeadingRow">
-            <h2 className="pageHeadingRow__title">Record Challenge</h2>
+            <h2 className="pageHeadingRow__title">RECORD CHALLENGE</h2>
             <div className="pageHeadingRow__tools">
               <RulesHelpIconButton onPress={() => setShowRules(true)} label="Duel rules" />
             </div>
@@ -962,12 +1013,15 @@ export function SocialPage() {
               inputMode="numeric"
             />
           </label>
+          <p className="socialRecordBallsPreview">
+            {formatChallengeBallsMarginLabel(winnerIsMe, Number(loserBallsRemaining) || 0)}
+          </p>
           {gameErr ? <p className="error">{gameErr}</p> : null}
           <button type="button" className="btn btn--go" onClick={() => void submitGame()} disabled={gameBusy || !opponentPick}>
             {gameBusy ? 'Saving…' : 'Save game'}
           </button>
 
-          <h2>Your Challenge history</h2>
+          <h2>YOUR CHALLENGE HISTORY</h2>
           {h2hSummary && h2hSummary.games > 0 ? (
             <p className="muted">
               {h2hSummary.games} games · {h2hSummary.wins}W-{h2hSummary.losses}L · Balls {h2hSummary.totalBallsFor ?? '—'} /{' '}
@@ -1383,12 +1437,14 @@ function FeedCard({
   )
 }
 
+const DAY_FIRST_DATE_LOCALE = 'en-GB'
+
 function formatFeedTimestamp(iso: string) {
   const createdMs = new Date(iso).getTime()
   if (!Number.isFinite(createdMs)) return ''
   const elapsedMs = Date.now() - createdMs
   if (elapsedMs < 0) {
-    return new Date(createdMs).toLocaleDateString([], { day: 'numeric', month: 'short' })
+    return new Date(createdMs).toLocaleDateString(DAY_FIRST_DATE_LOCALE, { day: 'numeric', month: 'short' })
   }
 
   const minuteMs = 60 * 1000
@@ -1407,7 +1463,7 @@ function formatFeedTimestamp(iso: string) {
     const days = Math.floor(elapsedMs / dayMs)
     return `${days}d ago`
   }
-  return new Date(createdMs).toLocaleDateString([], { day: 'numeric', month: 'short' })
+  return new Date(createdMs).toLocaleDateString(DAY_FIRST_DATE_LOCALE, { day: 'numeric', month: 'short' })
 }
 
 function BellGlyph() {

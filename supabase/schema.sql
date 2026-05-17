@@ -291,6 +291,44 @@ drop policy if exists "head_to_head_all_delete" on public.head_to_head_games;
 create policy "head_to_head_all_delete"
 on public.head_to_head_games for delete to anon, authenticated using (true);
 
+create table if not exists public.killer_pool_results (
+  id uuid primary key default gen_random_uuid(),
+  game_key text not null,
+  profile_id text not null references public.user_accounts (profile_id) on delete cascade,
+  username_key text,
+  did_win boolean not null,
+  created_at timestamptz not null default now(),
+  unique (game_key, profile_id)
+);
+
+create index if not exists killer_pool_results_profile_idx
+  on public.killer_pool_results (profile_id);
+
+create index if not exists killer_pool_results_username_key_idx
+  on public.killer_pool_results (username_key);
+
+create index if not exists killer_pool_results_created_idx
+  on public.killer_pool_results (created_at desc);
+
+alter table public.killer_pool_results enable row level security;
+grant select, insert, update, delete on table public.killer_pool_results to anon, authenticated;
+
+drop policy if exists "killer_pool_results_all_select" on public.killer_pool_results;
+create policy "killer_pool_results_all_select"
+on public.killer_pool_results for select to anon, authenticated using (true);
+
+drop policy if exists "killer_pool_results_all_insert" on public.killer_pool_results;
+create policy "killer_pool_results_all_insert"
+on public.killer_pool_results for insert to anon, authenticated with check (true);
+
+drop policy if exists "killer_pool_results_all_update" on public.killer_pool_results;
+create policy "killer_pool_results_all_update"
+on public.killer_pool_results for update to anon, authenticated using (true) with check (true);
+
+drop policy if exists "killer_pool_results_all_delete" on public.killer_pool_results;
+create policy "killer_pool_results_all_delete"
+on public.killer_pool_results for delete to anon, authenticated using (true);
+
 create table if not exists public.feed_posts (
   id uuid primary key default gen_random_uuid(),
   poster_profile_id text not null references public.user_accounts (profile_id) on delete cascade,
@@ -355,3 +393,39 @@ drop policy if exists "social_images_anon_delete" on storage.objects;
 create policy "social_images_anon_delete"
 on storage.objects for delete to anon, authenticated
 using (bucket_id = 'social-images');
+
+-- Push notification device tokens (Expo). One token can move between accounts/devices.
+create table if not exists public.push_device_tokens (
+  id uuid primary key default gen_random_uuid(),
+  profile_id text not null references public.user_accounts (profile_id) on delete cascade,
+  expo_push_token text not null unique,
+  platform text not null check (platform in ('ios', 'android', 'web')),
+  enabled boolean not null default true,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists push_device_tokens_profile_idx
+  on public.push_device_tokens (profile_id);
+
+create index if not exists push_device_tokens_enabled_idx
+  on public.push_device_tokens (enabled);
+
+alter table public.push_device_tokens enable row level security;
+grant select, insert, update, delete on table public.push_device_tokens to anon, authenticated;
+
+drop policy if exists "push_device_tokens_all_select" on public.push_device_tokens;
+create policy "push_device_tokens_all_select"
+on public.push_device_tokens for select to anon, authenticated using (true);
+
+drop policy if exists "push_device_tokens_all_insert" on public.push_device_tokens;
+create policy "push_device_tokens_all_insert"
+on public.push_device_tokens for insert to anon, authenticated with check (true);
+
+drop policy if exists "push_device_tokens_all_update" on public.push_device_tokens;
+create policy "push_device_tokens_all_update"
+on public.push_device_tokens for update to anon, authenticated using (true) with check (true);
+
+drop policy if exists "push_device_tokens_all_delete" on public.push_device_tokens;
+create policy "push_device_tokens_all_delete"
+on public.push_device_tokens for delete to anon, authenticated using (true);

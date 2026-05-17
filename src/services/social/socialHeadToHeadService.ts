@@ -54,6 +54,17 @@ function opponentBalls(row: HeadToHeadRow, profileId: string) {
     : row.player_one_balls_remaining
 }
 
+/** Win: +{loser balls remaining}; loss: −{your balls remaining}. */
+export function formatChallengeBallsMarginLabel(viewerWon: boolean, loserBallsRemaining: number): string {
+  return viewerWon ? `+${loserBallsRemaining} balls` : `-${loserBallsRemaining} balls`
+}
+
+export function formatHeadToHeadBallsLabel(row: HeadToHeadRow, viewerId: string): string {
+  const viewerWon = row.winner_profile_id === viewerId
+  const loserBallsRemaining = viewerWon ? opponentBalls(row, viewerId) : viewerBalls(row, viewerId)
+  return formatChallengeBallsMarginLabel(viewerWon, loserBallsRemaining)
+}
+
 export async function listHeadToHeadForPair(
   profileIdA: string,
   profileIdB: string,

@@ -114,7 +114,11 @@ export function LeaderboardScreen(): React.JSX.Element {
   }
 
   return (
-    <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
       {loading ? (
         <View style={styles.loadingRow}>
           <ActivityIndicator color="#99A2B5" />

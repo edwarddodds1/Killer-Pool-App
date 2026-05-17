@@ -12,8 +12,10 @@ import {
   allocateBalls,
   killerPoolRoomCountsTowardPlayerStats,
   pickPlayerByBall,
+  removePlayerFromRoom,
   shuffle,
 } from '../utils/game'
+import { isAdminUsername } from '../utils/admin'
 import {
   getProfile,
   recordKillerPoolMatchResult,
@@ -192,6 +194,29 @@ export function RoomPage() {
   const roomSnapshotRef = useRef<string>(JSON.stringify(room))
   const roomRef = useRef<RoomState | null>(room)
   const recordedResultKeysRef = useRef<Set<string>>(new Set())
+
+  roomRef.current = room
+
+  useEffect(() => {
+    return () => {
+      if (!profile) return
+      const snapshot = roomRef.current
+      if (!snapshot || snapshot.status !== 'lobby') return
+      if (!snapshot.players.some((player) => player.id === profile.id)) return
+
+      void (async () => {
+        const remote = await getRoomRemote(code)
+        const base =
+          remote && shouldAcceptIncomingRoom(remote, snapshot) ? remote : snapshot
+        if (base.status !== 'lobby') return
+        if (!base.players.some((player) => player.id === profile.id)) return
+        const next = removePlayerFromRoom(base, profile.id)
+        const stamped = stampRoomForWrite(next, base)
+        upsertRoom(stamped)
+        void upsertRoomRemote(stamped)
+      })()
+    }
+  }, [code, profile])
 
   useEffect(() => {
     if (!profile) {
@@ -723,6 +748,7 @@ export function RoomPage() {
   }
 
   const addRandomBots = () => {
+    if (!isAdminUsername(profile?.username)) return
     if (isLateJoinLocked) return
     if (room.status !== 'lobby') return
     const openSpots = MAX_PLAYERS - room.players.length
@@ -753,6 +779,7 @@ export function RoomPage() {
   }
 
   const clearBots = () => {
+    if (!isAdminUsername(profile?.username)) return
     if (isLateJoinLocked) return
     if (room.status !== 'lobby') return
     saveRoom({ ...room, players: room.players.filter((player) => !player.isBot) })
@@ -816,7 +843,9 @@ export function RoomPage() {
               {room.status === 'lobby' ? <p>Code: {room.code}</p> : null}
               {showPreGameModeLabel ? (
                 <div className="headerMetaRow">
-                  <p className="headerMetaLabel">{modeAllocationLabel}</p>
+                  <p className="headerModeTagKiller">
+                    Killer Pool · {modeAllocationLabel}
+                  </p>
                   <RulesHelpIconButton onPress={() => setShowRules(true)} label="Room mode rules" />
                 </div>
               ) : null}
@@ -825,6 +854,13 @@ export function RoomPage() {
         {showHeaderEyeToggle ? (
           room.mode === 'killer' ? (
             <div className="headerBallIndicatorWrap">
+              <div className={`headerBallTray ${showHeaderBalls ? 'headerBallTray--open' : ''}`} aria-hidden={!showHeaderBalls}>
+                <div className="headerBallIndicator">
+                  {sortBallsAsc(me.assignedBalls).map((ball) => (
+                    <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
+                  ))}
+                </div>
+              </div>
               <button
                 type="button"
                 className="headerBallToggle"
@@ -846,13 +882,6 @@ export function RoomPage() {
                   </svg>
                 </span>
               </button>
-              <div className={`headerBallTray ${showHeaderBalls ? 'headerBallTray--open' : ''}`} aria-hidden={!showHeaderBalls}>
-                <div className="headerBallIndicator">
-                  {sortBallsAsc(me.assignedBalls).map((ball) => (
-                    <BallIcon key={ball} ball={ball} sunk={room.sunkBalls.includes(ball)} />
-                  ))}
-                </div>
-              </div>
             </div>
           ) : (
             <div className="headerBallIndicator">
@@ -936,14 +965,16 @@ export function RoomPage() {
             <button className="btn btn--primary" onClick={startAllocation} disabled={isLateJoinLocked || !allReady}>
               Start Ball Allocation
             </button>
-            <div className="split">
-              <button className="btn" onClick={addRandomBots} disabled={isLateJoinLocked || room.players.length >= MAX_PLAYERS}>
-                Add Bot
-              </button>
-              <button className="btn" onClick={clearBots} disabled={isLateJoinLocked || botsCount === 0}>
-                Clear bots
-              </button>
-            </div>
+            {isAdminUsername(profile?.username) ? (
+              <div className="split">
+                <button className="btn" onClick={addRandomBots} disabled={isLateJoinLocked || room.players.length >= MAX_PLAYERS}>
+                  Add Bot
+                </button>
+                <button className="btn" onClick={clearBots} disabled={isLateJoinLocked || botsCount === 0}>
+                  Clear bots
+                </button>
+              </div>
+            ) : null}
           </div>
         </section>
       ) : null}
@@ -1040,7 +1071,9 @@ export function RoomPage() {
                 onClick={endTurn}
                 disabled={isLateJoinLocked}
               >
-                End turn
+                {currentTurnPlayer
+                  ? `End ${currentTurnPlayer.username}'s turn`
+                  : 'End turn'}
               </button>
               <button
                 className="inGameUndoBtn"

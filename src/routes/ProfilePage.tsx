@@ -1,4 +1,4 @@
-import { type ChangeEvent, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type PointerEvent as ReactPointerEvent, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
 import { AdminNameIcon } from '../components/AdminNameIcon'
@@ -21,7 +21,18 @@ import {
 } from '../services/social/socialHeadToHeadService'
 import { uploadProfileAvatar } from '../services/social/socialProfilePictureService'
 import type { TimerScore } from '../types'
-import { formatTimerElapsedMs, timerScoreBelongsToProfile, timerScoreKey } from '../../shared/timerLeaderboard'
+import {
+  nearestProgressVertexAtPlotX,
+  plotXFromLocalX,
+  type ProgressScrubSample,
+} from '../../shared/progressChartScrub'
+import {
+  formatMinutesSeconds,
+  formatTimerElapsedMs,
+  parseFormattedTimerInput,
+  timerScoreBelongsToProfile,
+  timerScoreKey,
+} from '../../shared/timerLeaderboard'
 import {
   deleteCurrentAccount,
   findKnownUsernameForProfileId,
@@ -36,6 +47,7 @@ import {
 
 const ADMIN_USERNAMES = new Set(['edwarddodds1'])
 const MIN_VALID_TIMER_RUN_MS = 20_000
+const PROGRESS_SCRUB_SCROLL_CANCEL_PX = 12
 const AVATAR_CROP_FRAME_SIZE = 280
 const AVATAR_UPLOAD_SIZE = 512
 
@@ -48,30 +60,13 @@ type AvatarCropDraft = {
 
 function formatRunDate(iso: string) {
   const date = new Date(iso)
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  return `${date.toLocaleDateString('en-GB')} ${date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-function parseFormattedTimerInput(value: string): number | null {
-  const trimmed = value.trim()
-  const match = trimmed.match(/^(\d{1,2}):([0-5]\d)\.(\d{2})$/)
-  if (!match) return null
-  const minutes = Number(match[1])
-  const seconds = Number(match[2])
-  const centiseconds = Number(match[3])
-  if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || !Number.isFinite(centiseconds)) return null
-  return minutes * 60_000 + seconds * 1_000 + centiseconds * 10
-}
 
 function buildLinePath(points: Array<{ x: number; y: number }>) {
   if (!points.length) return ''
   return points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ')
-}
-
-function formatMinutesSeconds(ms: number) {
-  const totalSeconds = Math.max(0, Math.round(ms / 1000))
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
 function clamp01(value: number) {
@@ -219,6 +214,7 @@ export function ProfilePage() {
   const [friendshipRowId, setFriendshipRowId] = useState<string | null>(null)
   const [friendBusy, setFriendBusy] = useState(false)
   const [friendMsg, setFriendMsg] = useState('')
+  const friendRequestSentClearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [avatarBusy, setAvatarBusy] = useState(false)
   const [avatarCropDraft, setAvatarCropDraft] = useState<AvatarCropDraft | null>(null)
   const [avatarCropZoom, setAvatarCropZoom] = useState(1)
@@ -246,6 +242,14 @@ export function ProfilePage() {
     frameCenterX: number
     frameCenterY: number
   } | null>(null)
+  const progressPlotRef = useRef<HTMLDivElement>(null)
+  const progressScrubPointerStartXRef = useRef(0)
+  const progressScrubPointerStartYRef = useRef(0)
+  const progressScrubCommittedRef = useRef(false)
+  const progressScrubActiveRef = useRef(false)
+  const progressPointerDownRef = useRef(false)
+  const [progressScrubActive, setProgressScrubActive] = useState(false)
+  const [progressScrubSample, setProgressScrubSample] = useState<ProgressScrubSample | null>(null)
   const deferredScores = useDeferredValue(scores)
   const requestedUsername = (searchParams.get('username') ?? '').trim()
   const avatarCropMetrics = useMemo(() => {
@@ -291,6 +295,12 @@ export function ProfilePage() {
       URL.revokeObjectURL(avatarCropDraft.previewUrl)
     }
   }, [avatarCropDraft?.previewUrl])
+
+  useEffect(() => {
+    return () => {
+      if (friendRequestSentClearRef.current) clearTimeout(friendRequestSentClearRef.current)
+    }
+  }, [])
 
   useEffect(() => {
     if (!avatarCropMetrics) return
@@ -470,6 +480,81 @@ export function ProfilePage() {
     }
   }, [progressRuns])
 
+  const progressChartPoints = useMemo(
+    () => lineChart.points.map((point) => ({ x: point.x, y: point.y, elapsedMs: point.run.elapsedMs })),
+    [lineChart.points],
+  )
+
+  const resetProgressScrub = useCallback(() => {
+    progressPointerDownRef.current = false
+    progressScrubCommittedRef.current = false
+    progressScrubActiveRef.current = false
+    setProgressScrubActive(false)
+    setProgressScrubSample(null)
+  }, [])
+
+  const updateProgressScrubFromClientX = useCallback(
+    (clientX: number) => {
+      const plotEl = progressPlotRef.current
+      if (!plotEl) return
+      const rect = plotEl.getBoundingClientRect()
+      if (rect.width <= 0) return
+      const localX = clientX - rect.left
+      const plotX = plotXFromLocalX(localX, rect.width, 0, lineChart.width)
+      const sample = nearestProgressVertexAtPlotX(progressChartPoints, plotX)
+      if (sample) setProgressScrubSample(sample)
+    },
+    [lineChart.width, progressChartPoints],
+  )
+
+  const onProgressPlotPointerDown = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.button !== 0) return
+      progressPointerDownRef.current = true
+      progressScrubPointerStartXRef.current = event.clientX
+      progressScrubPointerStartYRef.current = event.clientY
+      progressScrubCommittedRef.current = false
+      progressScrubActiveRef.current = true
+      setProgressScrubActive(true)
+      updateProgressScrubFromClientX(event.clientX)
+    },
+    [updateProgressScrubFromClientX],
+  )
+
+  const onProgressPlotPointerMove = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (!progressPointerDownRef.current || !progressScrubActiveRef.current) return
+      if (!progressScrubCommittedRef.current) {
+        const deltaX = Math.abs(event.clientX - progressScrubPointerStartXRef.current)
+        const deltaY = Math.abs(event.clientY - progressScrubPointerStartYRef.current)
+        if (deltaY > PROGRESS_SCRUB_SCROLL_CANCEL_PX && deltaY > deltaX) {
+          resetProgressScrub()
+          return
+        }
+        if (deltaX > 4 || deltaY <= PROGRESS_SCRUB_SCROLL_CANCEL_PX) {
+          progressScrubCommittedRef.current = true
+        }
+      }
+      updateProgressScrubFromClientX(event.clientX)
+    },
+    [resetProgressScrub, updateProgressScrubFromClientX],
+  )
+
+  const onProgressPlotPointerUp = useCallback(() => {
+    resetProgressScrub()
+  }, [resetProgressScrub])
+
+  const onProgressPlotPointerLeave = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      if (event.buttons === 0) {
+        resetProgressScrub()
+      }
+    },
+    [resetProgressScrub],
+  )
+
+  useEffect(() => () => resetProgressScrub(), [resetProgressScrub])
+
   const weekdayAverages = useMemo(() => {
     const now = new Date()
     const startOfWeek = new Date(now)
@@ -494,11 +579,12 @@ export function ProfilePage() {
       }
     }
     const labels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-    return labels.map((label, day) => {
-      const stat = byDay.get(day)
+    return labels.map((label, dayOfWeek) => {
+      const stat = byDay.get(dayOfWeek)
       const avg = stat ? Math.round(stat.total / stat.runs) : null
       return {
         label,
+        dayOfWeek,
         runs: stat?.runs ?? 0,
         averageMs: avg,
       }
@@ -509,6 +595,7 @@ export function ProfilePage() {
     1,
     ...weekdayAverages.map((entry) => (entry.averageMs === null ? 0 : entry.averageMs)),
   )
+  const todayWeekday = new Date().getDay()
 
   const personalRank = useMemo(() => {
     if (!bestRun) return null
@@ -828,6 +915,10 @@ export function ProfilePage() {
   const onAddFriendProfile = async () => {
     if (!profile?.id || !killerPoolProfileId) return
     setFriendBusy(true)
+    if (friendRequestSentClearRef.current) {
+      clearTimeout(friendRequestSentClearRef.current)
+      friendRequestSentClearRef.current = null
+    }
     setFriendMsg('')
     try {
       const uname = await fetchUsernameForProfileId(killerPoolProfileId)
@@ -835,8 +926,17 @@ export function ProfilePage() {
       await sendFriendRequestByUsername(profile.id, uname)
       await refreshSocialRel()
       setFriendMsg('Friend request sent.')
+      friendRequestSentClearRef.current = setTimeout(() => {
+        setFriendMsg((m) => (m === 'Friend request sent.' ? '' : m))
+        friendRequestSentClearRef.current = null
+      }, 3000)
     } catch (e) {
-      setFriendMsg(e instanceof Error ? e.message : 'Could not send request.')
+      const msg = e instanceof Error ? e.message : 'Could not send request.'
+      setFriendMsg(msg)
+      friendRequestSentClearRef.current = setTimeout(() => {
+        setFriendMsg((m) => (m === msg ? '' : m))
+        friendRequestSentClearRef.current = null
+      }, 3000)
     } finally {
       setFriendBusy(false)
     }
@@ -1053,36 +1153,23 @@ export function ProfilePage() {
                   onClick={() => setShowFormInfo(true)}
                 >
                   <span className="profileFormLabel">Form</span>
-                  {Array.from({ length: 5 }, (_, index) => (
-                    <svg
-                      key={index}
-                      viewBox="0 0 24 24"
-                      className="profileFormStar"
-                      aria-hidden="true"
-                    >
-                    <defs>
-                      <clipPath id={`profile-form-star-fill-${index}`}>
-                        <rect
-                          x="0"
-                          y="0"
-                          width={`${Math.max(0, Math.min(1, formRating - index)) * 24}`}
-                          height="24"
-                        />
-                      </clipPath>
-                    </defs>
-                    <path
-                      className="profileFormStarBase"
-                      d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
-                      fill="currentColor"
-                    />
-                    <path
-                      className="profileFormStarFill"
-                      d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z"
-                      fill="currentColor"
-                      clipPath={`url(#profile-form-star-fill-${index})`}
-                    />
-                  </svg>
-                  ))}
+                  {Array.from({ length: 5 }, (_, index) => {
+                    const fill = Math.max(0, Math.min(1, formRating - index))
+                    return (
+                      <span key={index} className="profileFormStar" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" className="profileFormStarSvg profileFormStarBase">
+                          <path d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z" fill="currentColor" />
+                        </svg>
+                        {fill > 0 ? (
+                          <span className="profileFormStarFillClip" style={{ width: `${fill * 100}%` }}>
+                            <svg viewBox="0 0 24 24" className="profileFormStarSvg profileFormStarFill">
+                              <path d="M12 2.6 14.9 8.5l6.5 1-4.7 4.6 1.1 6.4L12 17.4 6.2 20.5l1.1-6.4-4.7-4.6 6.5-1L12 2.6Z" fill="currentColor" />
+                            </svg>
+                          </span>
+                        ) : null}
+                      </span>
+                    )
+                  })}
                 </button>
               ) : null}
             </div>
@@ -1262,7 +1349,15 @@ export function ProfilePage() {
                   </span>
                 ))}
               </div>
-              <div className="profileChartPlot">
+              <div
+                ref={progressPlotRef}
+                className={`profileChartPlot${progressScrubActive ? ' profileChartPlot--scrubbing' : ''}`}
+                onPointerDown={onProgressPlotPointerDown}
+                onPointerMove={onProgressPlotPointerMove}
+                onPointerUp={onProgressPlotPointerUp}
+                onPointerCancel={onProgressPlotPointerUp}
+                onPointerLeave={onProgressPlotPointerLeave}
+              >
                 <svg viewBox={`0 0 ${lineChart.width} ${lineChart.height}`} preserveAspectRatio="none" className="profileLineChart">
                   {lineChart.ticks.map((tick) => (
                     <line
@@ -1289,7 +1384,37 @@ export function ProfilePage() {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   />
+                  {progressScrubActive && progressScrubSample ? (
+                    <>
+                      <line
+                        x1={progressScrubSample.x}
+                        x2={progressScrubSample.x}
+                        y1={0}
+                        y2={lineChart.height}
+                        className="profileLineScrubGuide"
+                      />
+                      <circle
+                        cx={progressScrubSample.x}
+                        cy={progressScrubSample.y}
+                        r={6}
+                        className="profileLineScrubDot"
+                      />
+                    </>
+                  ) : null}
                 </svg>
+                {progressScrubActive && progressScrubSample ? (
+                  <div
+                    className="profileLineScrubTooltip"
+                    style={{
+                      left: `${Math.min(
+                        92,
+                        Math.max(8, (progressScrubSample.x / Math.max(1, lineChart.width)) * 100),
+                      )}%`,
+                    }}
+                  >
+                    {formatTimerElapsedMs(progressScrubSample.elapsedMs)}
+                  </div>
+                ) : null}
                 <small className="profileLineAverageLabel">
                   Average: {formatTimerElapsedMs(lineChart.averageValue)}
                 </small>
@@ -1305,8 +1430,12 @@ export function ProfilePage() {
           <div className="profileBars">
             {weekdayAverages.map((entry) => {
               const heightPct = entry.averageMs ? Math.max(12, (entry.averageMs / maxWeekdayAverage) * 100) : 0
+              const isToday = entry.dayOfWeek === todayWeekday
               return (
-                <div key={entry.label} className="profileBarCol">
+                <div
+                  key={entry.label}
+                  className={isToday ? 'profileBarCol profileBarColToday' : 'profileBarCol'}
+                >
                   <div className="profileBarTrack">
                     {entry.averageMs ? <div className="profileBarFill" style={{ height: `${heightPct}%` }} /> : null}
                   </div>

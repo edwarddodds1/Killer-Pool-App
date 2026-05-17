@@ -13,6 +13,7 @@ import { SocialNotificationsContext } from './socialNotificationsContext'
 
 const NOTIFICATIONS_LIMIT = 20
 const TIMER_SCORES_TABLE = 'timer_pool_scores'
+const PB_NOTIFICATION_SCORE_ROW_WINDOW = 4000
 
 type TimerScoreNotificationRow = {
   profile_id: string
@@ -25,24 +26,26 @@ function notificationsSeenStorageKey(profileId: string) {
   return `killerpool:social-notifications-seen:${profileId}`
 }
 
-async function buildFriendPbNotifications(friendIds: string[]) {
+async function buildGlobalPbNotifications() {
   const client = supabase
-  if (!client || !friendIds.length) return []
+  if (!client) return []
 
-  const { data: friendRows, error: friendRowsError } = await client
+  const { data: recentRows, error: recentError } = await client
     .from(TIMER_SCORES_TABLE)
     .select('profile_id, username, elapsed_ms, created_at')
-    .in('profile_id', friendIds)
-    .order('created_at', { ascending: true })
-    .limit(500)
+    .order('created_at', { ascending: false })
+    .limit(PB_NOTIFICATION_SCORE_ROW_WINDOW)
     .returns<TimerScoreNotificationRow[]>()
-  if (friendRowsError || !friendRows) return []
+  if (recentError || !recentRows?.length) return []
 
   const rowsByProfile = new Map<string, TimerScoreNotificationRow[]>()
-  for (const row of friendRows) {
+  for (const row of recentRows) {
     const list = rowsByProfile.get(row.profile_id) ?? []
     list.push(row)
     rowsByProfile.set(row.profile_id, list)
+  }
+  for (const rows of rowsByProfile.values()) {
+    rows.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
   }
 
   const latestPbByProfile = new Map<
@@ -62,7 +65,7 @@ async function buildFriendPbNotifications(friendIds: string[]) {
         if (Number.isFinite(bestSoFar)) {
           latestPbByProfile.set(profileId, {
             profileId,
-            username: row.username || 'A friend',
+            username: row.username || 'Player',
             elapsedMs: row.elapsed_ms,
             createdAt: row.created_at,
             droppedMs: bestSoFar - row.elapsed_ms,
@@ -99,7 +102,7 @@ async function buildFriendPbNotifications(friendIds: string[]) {
       type: 'pb' as const,
       createdAt: entry.createdAt,
       title: 'New personal best',
-      body: `${entry.username} hit a new PB.`,
+      body: `${entry.username} set a new personal best.`,
       pbElapsedMs: entry.elapsedMs,
       pbDroppedMs: entry.droppedMs,
       pbRankCopy: rankCopy,
@@ -152,7 +155,8 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
       setPendingFriendRequests(pendingCount)
 
       const friendIds = friends.map((entry) => entry.friendProfileId)
-      const pbNotifications = await buildFriendPbNotifications(friendIds)
+      const friendIdSet = new Set(friendIds)
+      const pbNotifications = (await buildGlobalPbNotifications()).filter((n) => n.actorProfileId !== profile.id)
       const feedPosts = friendIds.length
         ? await fetchFeedPage({
             viewerProfileId: profile.id,
@@ -197,7 +201,10 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
         })),
         ...pbNotifications,
         ...feedPosts
-          .filter((post) => post.poster_profile_id !== profile.id)
+          .filter(
+            (post) =>
+              post.poster_profile_id !== profile.id && friendIdSet.has(post.poster_profile_id),
+          )
           .map((post) => {
             const posterName = names[post.poster_profile_id] ?? 'A friend'
             const oppName = post.opponent_profile_id ? names[post.opponent_profile_id] ?? 'another player' : null
@@ -212,24 +219,29 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
               actorUsername: posterName,
             }
           }),
-        ...h2hRows.map((game) => {
-          const opponentId =
-            game.player_one_profile_id === profile.id ? game.player_two_profile_id : game.player_one_profile_id
-          const opponentName = names[opponentId] ?? 'Another player'
-          const youWon = game.winner_profile_id === profile.id
-          return {
-            id: `game:${game.id}`,
-            type: 'game' as const,
-            createdAt: game.played_at,
-            title: 'Challenge result recorded',
-            body: youWon
-              ? `Your match against ${opponentName} was recorded as a win.`
-              : `A match against ${opponentName} was recorded in Social.`,
-            href: `/profile/${encodeURIComponent(opponentId)}?username=${encodeURIComponent(opponentName)}`,
-            actorProfileId: opponentId,
-            actorUsername: opponentName,
-          }
-        }),
+        ...h2hRows
+          .filter(
+            (game) =>
+              game.player_one_profile_id === profile.id || game.player_two_profile_id === profile.id,
+          )
+          .map((game) => {
+            const opponentId =
+              game.player_one_profile_id === profile.id ? game.player_two_profile_id : game.player_one_profile_id
+            const opponentName = names[opponentId] ?? 'Another player'
+            const youWon = game.winner_profile_id === profile.id
+            return {
+              id: `game:${game.id}`,
+              type: 'game' as const,
+              createdAt: game.played_at,
+              title: 'Challenge result recorded',
+              body: youWon
+                ? `Your match against ${opponentName} was recorded as a win.`
+                : `Your match against ${opponentName} was recorded in Social.`,
+              href: `/profile/${encodeURIComponent(opponentId)}?username=${encodeURIComponent(opponentName)}`,
+              actorProfileId: opponentId,
+              actorUsername: opponentName,
+            }
+          }),
       ]
         .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
         .slice(0, NOTIFICATIONS_LIMIT)
@@ -291,6 +303,13 @@ export function SocialNotificationsProvider({ children }: { children: ReactNode 
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'head_to_head_games' },
+        () => {
+          void refreshNotifications()
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: TIMER_SCORES_TABLE },
         () => {
           void refreshNotifications()
         },

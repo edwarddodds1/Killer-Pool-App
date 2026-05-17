@@ -25,24 +25,56 @@ export async function fetchUsernamesForProfileIds(ids: string[]): Promise<Record
   return Object.fromEntries(data.map((r) => [r.profile_id, r.username]))
 }
 
+function filterFeedRowsForAllowedPosters(rows: FeedPostRow[], allowedPosters: Set<string>): FeedPostRow[] {
+  return rows.filter((row) => allowedPosters.has(row.poster_profile_id))
+}
+
+/** Newest posts first (top of feed), then older as you scroll down. */
+export function compareFeedPostsNewestFirst(a: FeedPostRow, b: FeedPostRow): number {
+  const aMs = Date.parse(a.created_at)
+  const bMs = Date.parse(b.created_at)
+  const aTime = Number.isFinite(aMs) ? aMs : 0
+  const bTime = Number.isFinite(bMs) ? bMs : 0
+  if (bTime !== aTime) return bTime - aTime
+  return b.id.localeCompare(a.id)
+}
+
+export function sortFeedPostsNewestFirst(rows: FeedPostRow[]): FeedPostRow[] {
+  return [...rows].sort(compareFeedPostsNewestFirst)
+}
+
+export function mergeFeedPostsNewestFirst(existing: FeedPostRow[], incoming: FeedPostRow[]): FeedPostRow[] {
+  const seen = new Set<string>()
+  const merged: FeedPostRow[] = []
+  for (const post of sortFeedPostsNewestFirst([...existing, ...incoming])) {
+    if (seen.has(post.id)) continue
+    seen.add(post.id)
+    merged.push(post)
+  }
+  return merged
+}
+
 export async function fetchFeedPage(params: {
   viewerProfileId: string
   allowedPosterIds: string[]
   offset: number
   pageSize: number
 }): Promise<FeedPostRow[]> {
-  if (!supabase || params.allowedPosterIds.length === 0) return []
+  if (!supabase) return []
+  const circleIds = [...new Set([params.viewerProfileId, ...params.allowedPosterIds].filter(Boolean))]
+  if (circleIds.length === 0) return []
+  const circle = new Set(circleIds)
   const { data, error } = await supabase
     .from(FEED_POSTS_TABLE)
     .select(
       'id, poster_profile_id, opponent_profile_id, winner_profile_id, image_url_left, image_url_right, caption, created_at',
     )
-    .in('poster_profile_id', params.allowedPosterIds)
+    .in('poster_profile_id', circleIds)
     .order('created_at', { ascending: false })
     .range(params.offset, params.offset + params.pageSize - 1)
     .returns<FeedPostRow[]>()
   if (error || !data) return []
-  return data
+  return sortFeedPostsNewestFirst(filterFeedRowsForAllowedPosters(data, circle))
 }
 
 export async function createFeedPostFromFiles(params: {

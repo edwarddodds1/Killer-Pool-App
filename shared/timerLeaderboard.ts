@@ -33,6 +33,24 @@ export function formatTimerElapsedMs(ms: number): string {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`
 }
 
+export function parseFormattedTimerInput(value: string): number | null {
+  const trimmed = value.trim()
+  const match = trimmed.match(/^(\d{1,2}):([0-5]\d)\.(\d{2})$/)
+  if (!match) return null
+  const minutes = Number(match[1])
+  const seconds = Number(match[2])
+  const centiseconds = Number(match[3])
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || !Number.isFinite(centiseconds)) return null
+  return minutes * 60_000 + seconds * 1_000 + centiseconds * 10
+}
+
+export function formatMinutesSeconds(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
 /** e.g. "21 Apr" for recent runs (day + short month). */
 export function formatRecentRunDayMonth(iso: string, locale?: string): string {
   const date = new Date(iso)

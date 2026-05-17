@@ -22,7 +22,7 @@ const LEADERBOARD_FRESH_WINDOW_MS = 48 * 60 * 60 * 1000
 
 function formatDateLabel(iso: string) {
   const date = new Date(iso)
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  return `${date.toLocaleDateString('en-GB')} ${date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
 }
 
 function isLeaderboardRecent(iso: string) {

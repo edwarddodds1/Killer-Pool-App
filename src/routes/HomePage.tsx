@@ -21,6 +21,9 @@ import {
   upsertRoomRemote,
 } from '../utils/store'
 
+/** Timer rank chip on home header only when inside this cutoff (profile always shows rank when set). */
+const HOME_TIMER_RANK_BUBBLE_MAX = 25
+
 export function HomePage() {
   const navigate = useNavigate()
   const [profile, setProfile] = useState(() => getProfile())
@@ -148,7 +151,7 @@ export function HomePage() {
           </div>
           <div className="homeTitleBlock">
             <h1 className="pageHeadingRow__title">KILLER POOL</h1>
-            {timerRank != null ? (
+            {timerRank != null && timerRank <= HOME_TIMER_RANK_BUBBLE_MAX ? (
               <div
                 className="homeTimerRankBubble"
                 aria-label={`Timer : number ${timerRank} ranked player`}
@@ -166,11 +169,12 @@ export function HomePage() {
       <section className="card card--pool homeCard">
         {!profile ? (
           <>
-            <div className="homeCard__header">
-              <h2>{authMode === 'signup' ? 'Create Account' : 'Sign In'}</h2>
-              <div className="authSwitch" role="tablist" aria-label="Authentication mode">
+            <div className="homeCard__header homeCard__header--auth">
+              <div className="authSwitch" role="tablist" aria-label="Sign in or create account">
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={authMode === 'signin'}
                   className={`authSwitch__btn ${authMode === 'signin' ? 'authSwitch__btn--active' : ''}`}
                   onClick={() => {
                     setError('')
@@ -181,6 +185,8 @@ export function HomePage() {
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  aria-selected={authMode === 'signup'}
                   className={`authSwitch__btn ${authMode === 'signup' ? 'authSwitch__btn--active' : ''}`}
                   onClick={() => {
                     setError('')
@@ -217,16 +223,6 @@ export function HomePage() {
               </button>
               <button type="button" className="btn btn--soft" onClick={onContinueAsGuest} disabled={authBusy}>
                 Continue as guest
-              </button>
-              <button
-                type="button"
-                className="btn btn--soft"
-                onClick={() => {
-                  setError('')
-                  setAuthMode((curr) => (curr === 'signup' ? 'signin' : 'signup'))
-                }}
-              >
-                {authMode === 'signup' ? 'I already have an account' : 'Create a new account'}
               </button>
             </form>
           </>

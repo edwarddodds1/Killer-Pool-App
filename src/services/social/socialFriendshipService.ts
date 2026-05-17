@@ -143,7 +143,7 @@ export async function getAcceptedFriends(profileId: string): Promise<FriendRecor
     }),
   )
 
-  return list.map((row) => {
+  const records = list.map((row) => {
     const friendId =
       row.requester_profile_id === profileId ? row.recipient_profile_id : row.requester_profile_id
     return {
@@ -152,6 +152,9 @@ export async function getAcceptedFriends(profileId: string): Promise<FriendRecor
       createdAt: row.created_at,
     }
   })
+  return records.sort((a, b) =>
+    a.friendUsername.localeCompare(b.friendUsername, undefined, { sensitivity: 'base' }),
+  )
 }
 
 export async function sendFriendRequestByUsername(viewerProfileId: string, username: string): Promise<void> {

@@ -69,6 +69,7 @@ export function RoomScreen({ route, navigation }: Props): React.JSX.Element {
       {me ? <Text style={styles.text}>You: {me.username}</Text> : null}
       <FlatList
         data={room.players}
+        showsVerticalScrollIndicator={false}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
