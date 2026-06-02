@@ -144,6 +144,7 @@ export function RoomPage() {
   const { code = '' } = useParams()
   const navigate = useNavigate()
   const profile = getProfile()
+  const profileId = profile?.id ?? null
   const [room, setRoom] = useState<RoomState | null>(() => getRoom(code))
   const [allocationPreview, setAllocationPreview] = useState<number | null>(null)
   const [orderSpinName, setOrderSpinName] = useState<string | null>(null)
@@ -170,27 +171,27 @@ export function RoomPage() {
 
   useEffect(() => {
     return () => {
-      if (!profile) return
+      if (!profileId) return
       const snapshot = roomRef.current
       if (!snapshot || snapshot.status !== 'lobby') return
-      if (!snapshot.players.some((player) => player.id === profile.id)) return
+      if (!snapshot.players.some((player) => player.id === profileId)) return
 
       void (async () => {
         const remote = await getRoomRemote(code)
         const base =
           remote && shouldAcceptIncomingRoom(remote, snapshot) ? remote : snapshot
         if (base.status !== 'lobby') return
-        if (!base.players.some((player) => player.id === profile.id)) return
-        const next = removePlayerFromRoom(base, profile.id)
+        if (!base.players.some((player) => player.id === profileId)) return
+        const next = removePlayerFromRoom(base, profileId)
         const stamped = stampRoomForWrite(next, base)
         upsertRoom(stamped)
         void upsertRoomRemote(stamped)
       })()
     }
-  }, [code, profile])
+  }, [code, profileId])
 
   useEffect(() => {
-    if (!profile) {
+    if (!profileId) {
       navigate('/')
       return
     }
@@ -253,7 +254,7 @@ export function RoomPage() {
       clearInterval(remoteTicker)
       unsubscribe()
     }
-  }, [code, navigate, profile])
+  }, [code, navigate, profileId])
 
   useEffect(
     () => () => {
