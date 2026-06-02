@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import type { ClipboardEvent, FormEvent, KeyboardEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AppHeaderNavIcons } from '../components/AppHeaderNavIcons'
+import { stampRoomForWrite } from '../utils/roomSync'
 import { getProfile, getRoom, getRoomRemote, upsertRoom, upsertRoomRemote } from '../utils/store'
 
 export function JoinPage() {
@@ -62,22 +63,30 @@ export function JoinPage() {
     if (room.status !== 'lobby') {
       return setError('This party is already in progress and can no longer be joined.')
     }
+    let nextRoom = room
     if (!room.players.some((player) => player.id === profile.id)) {
-      room.players.push({
-        id: profile.id,
-        username: profile.username,
-        avatarIcon: profile.avatarIcon,
-        isBot: false,
-        ready: false,
-        assignedBalls: [],
-        pottedBalls: [],
-        turns: 0,
-        kills: 0,
-        eliminated: false,
-      })
+      nextRoom = {
+        ...room,
+        players: [
+          ...room.players,
+          {
+            id: profile.id,
+            username: profile.username,
+            avatarIcon: profile.avatarIcon,
+            isBot: false,
+            ready: false,
+            assignedBalls: [],
+            pottedBalls: [],
+            turns: 0,
+            kills: 0,
+            eliminated: false,
+          },
+        ],
+      }
     }
-    upsertRoom(room)
-    await upsertRoomRemote(room)
+    const stamped = stampRoomForWrite(nextRoom, room)
+    upsertRoom(stamped)
+    await upsertRoomRemote(stamped)
     navigate(`/room/${cleanCode}`)
   }
 
